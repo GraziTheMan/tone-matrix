@@ -37,14 +37,22 @@ jobs:
           fi
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/tonematrix.keystore"
 
-      - name: Build release APK
+      - name: Build release APK and Play bundle
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/tonematrix.keystore
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-        run: cd android && ./gradlew assembleRelease --no-daemon
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 0.1.${{ github.run_number }}
+        run: cd android && ./gradlew assembleRelease bundleRelease --no-daemon
 
       - uses: actions/upload-artifact@v4
         with:
           name: tone-matrix-apk
           path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tone-matrix-playstore-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
