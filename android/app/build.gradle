@@ -9,8 +9,10 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI sets these from the workflow run number so every Play upload has
         // a strictly increasing versionCode without manual bumps.
-        versionCode (System.getenv("VERSION_CODE") ?: "1").toInteger()
-        versionName (System.getenv("VERSION_NAME") ?: "0.1.0-dev")
+        def ciVersionCode = (System.getenv("VERSION_CODE") ?: "1").toInteger()
+        def ciVersionName = System.getenv("VERSION_NAME") ?: "0.1.0-dev"
+        versionCode ciVersionCode
+        versionName ciVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
