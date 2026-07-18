@@ -9,6 +9,7 @@
   --text: #dce6f2;
   --muted: #7b8a9d;
   --accent: #ffb74d;
+  --accent-glow: rgba(255, 183, 77, 0.5);
 }
 
 * {
@@ -17,19 +18,24 @@
   padding: 0;
 }
 
-html,
-body {
+html {
   height: 100%;
 }
 
 body {
+  min-height: 100%;
   background: radial-gradient(1200px 800px at 50% -10%, #141d29, var(--bg));
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   display: flex;
-  align-items: center;
-  justify-content: center;
   touch-action: manipulation;
+}
+
+/* margin:auto centers when there's room but degrades to normal top-anchored
+   scrolling when content is taller than the viewport (align-items:center
+   would clip the top unreachably). */
+.app {
+  margin: auto;
 }
 
 .app {
@@ -124,6 +130,11 @@ body {
   -webkit-user-select: none;
 }
 
+.drum-grid {
+  aspect-ratio: 4;
+  margin-top: clamp(6px, 1.4vw, 12px);
+}
+
 .cell {
   border: none;
   border-radius: 18%;
@@ -147,8 +158,28 @@ body {
   box-shadow: 0 0 10px var(--on-glow);
 }
 
+.cell.drum.on {
+  background: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
 .cell.on.pulse {
   animation: pulse 0.45s ease-out;
+}
+
+.cell.drum.on.pulse {
+  animation: pulse-drum 0.45s ease-out;
+}
+
+@keyframes pulse-drum {
+  0% {
+    box-shadow: 0 0 22px 6px var(--accent-glow);
+    filter: brightness(1.9);
+  }
+  100% {
+    box-shadow: 0 0 10px var(--accent-glow);
+    filter: brightness(1);
+  }
 }
 
 @keyframes pulse {
@@ -167,4 +198,72 @@ body {
   text-align: center;
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+#scale {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #223044;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.settings {
+  margin-top: 16px;
+  background: var(--panel);
+  border: 1px solid #223044;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+}
+
+.settings summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.settings-note {
+  margin: 10px 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.drum-map {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.drum-map-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drum-map-name {
+  width: 90px;
+  color: var(--text);
+}
+
+.drum-map-row input {
+  width: 70px;
+  background: var(--cell);
+  color: var(--text);
+  border: 1px solid #223044;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.9rem;
+}
+
+.drum-map-note {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-small {
+  padding: 6px 10px;
+  font-size: 0.8rem;
 }

@@ -21,8 +21,11 @@ export class AudioEngine {
     this.currentStep = 0;
     this.nextNoteTime = 0;
     this.playing = false;
+    this.noiseBuffer = null;
     // Set by the app each tick: (step) => array of MIDI notes to play.
     this.getNotesForStep = () => [];
+    // (step) => array of drum ids ("kick", "snare", ...) to play.
+    this.getDrumsForStep = () => [];
   }
 
   ensureContext() {
@@ -74,6 +77,9 @@ export class AudioEngine {
       for (const midi of this.getNotesForStep(step)) {
         this.playNote(midi, when);
       }
+      for (const drum of this.getDrumsForStep(step)) {
+        this.playDrum(drum, when);
+      }
       this.onStep(step, when);
       this.nextNoteTime += this.secondsPerStep();
       this.currentStep = (this.currentStep + 1) % this.steps;
@@ -119,5 +125,78 @@ export class AudioEngine {
     this.ensureContext();
     if (this.ctx.state === "suspended") this.ctx.resume();
     this.playNote(midi, this.ctx.currentTime, 0.8);
+  }
+
+  previewDrum(id) {
+    this.ensureContext();
+    if (this.ctx.state === "suspended") this.ctx.resume();
+    this.playDrum(id, this.ctx.currentTime);
+  }
+
+  getNoiseBuffer() {
+    if (!this.noiseBuffer) {
+      const len = this.ctx.sampleRate; // 1 second of white noise
+      this.noiseBuffer = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+      const data = this.noiseBuffer.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    }
+    return this.noiseBuffer;
+  }
+
+  noiseSource(when, dur, { type, freq, gain }) {
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = this.getNoiseBuffer();
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = freq;
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(gain, when);
+    env.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    src.connect(filter);
+    filter.connect(env);
+    env.connect(this.master);
+    src.start(when);
+    src.stop(when + dur + 0.05);
+  }
+
+  // Synthesized drum kit, kept dry (no delay send) so the groove stays tight.
+  playDrum(id, when) {
+    const ctx = this.ctx;
+    switch (id) {
+      case "kick": {
+        const osc = ctx.createOscillator();
+        osc.frequency.setValueAtTime(150, when);
+        osc.frequency.exponentialRampToValueAtTime(45, when + 0.11);
+        const env = ctx.createGain();
+        env.gain.setValueAtTime(0.85, when);
+        env.gain.exponentialRampToValueAtTime(0.0001, when + 0.3);
+        osc.connect(env);
+        env.connect(this.master);
+        osc.start(when);
+        osc.stop(when + 0.35);
+        break;
+      }
+      case "snare": {
+        this.noiseSource(when, 0.18, { type: "bandpass", freq: 1800, gain: 0.5 });
+        const body = ctx.createOscillator();
+        body.type = "triangle";
+        body.frequency.value = 185;
+        const env = ctx.createGain();
+        env.gain.setValueAtTime(0.35, when);
+        env.gain.exponentialRampToValueAtTime(0.0001, when + 0.12);
+        body.connect(env);
+        env.connect(this.master);
+        body.start(when);
+        body.stop(when + 0.15);
+        break;
+      }
+      case "hatClosed":
+        this.noiseSource(when, 0.05, { type: "highpass", freq: 7000, gain: 0.3 });
+        break;
+      case "hatOpen":
+        this.noiseSource(when, 0.32, { type: "highpass", freq: 6500, gain: 0.26 });
+        break;
+    }
   }
 }

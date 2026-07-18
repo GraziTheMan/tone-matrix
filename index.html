@@ -22,14 +22,26 @@
             <input id="bpm" type="range" min="40" max="240" step="1" value="120" />
           </label>
           <select id="root" title="Root note"></select>
+          <select id="scale" title="Scale"></select>
           <button id="clear" class="btn">Clear</button>
           <button id="export" class="btn btn-accent">Export MIDI</button>
         </div>
       </header>
-      <div id="grid" class="grid" role="grid" aria-label="Step sequencer grid"></div>
+      <div id="grid" class="grid" role="grid" aria-label="Melody grid"></div>
+      <div id="drum-grid" class="grid drum-grid" role="grid" aria-label="Percussion grid"></div>
+      <details class="settings">
+        <summary>Percussion MIDI mapping</summary>
+        <p class="settings-note">
+          Exported drum notes go to MIDI channel 10. Defaults follow General
+          MIDI; remap them here if your instrument puts kick or snare on
+          different keys.
+        </p>
+        <div id="drum-map" class="drum-map"></div>
+        <button id="drum-map-reset" class="btn btn-small">Reset to General MIDI</button>
+      </details>
       <footer class="hint">
-        Tap or drag to paint notes &middot; every combination is in key &middot; your
-        pattern is saved automatically
+        Tap or drag to paint &middot; top grid is melody, bottom is drums &middot;
+        your pattern is saved automatically
       </footer>
     </main>
     <script type="module" src="/src/main.js"></script>

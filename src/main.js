@@ -1,4 +1,12 @@
-import { ROWS, STEPS, ROOT_CHOICES, buildRowNotes } from "./scale.js";
+import {
+  ROWS,
+  STEPS,
+  SCALES,
+  ROOT_CHOICES,
+  buildRowNotes,
+  midiNoteName,
+} from "./scale.js";
+import { DRUMS, DRUM_ROWS, defaultDrumMap } from "./drums.js";
 import { AudioEngine } from "./audio.js";
 import { gridToMidi, downloadMidi } from "./midi.js";
 
@@ -6,14 +14,35 @@ const STORAGE_KEY = "tone-matrix-state";
 
 // ---- State ----------------------------------------------------------------
 
-let grid = Array.from({ length: ROWS }, () => Array(STEPS).fill(false));
+const emptyGrid = (rows) => Array.from({ length: rows }, () => Array(STEPS).fill(false));
+
+let grid = emptyGrid(ROWS);
+let drumGrid = emptyGrid(DRUM_ROWS);
 let bpm = 120;
 let rootIndex = 0;
-let rowNotes = buildRowNotes(ROOT_CHOICES[rootIndex].midi);
+let scaleIndex = 0;
+let drumMap = defaultDrumMap();
+let rowNotes = buildRowNotes(ROOT_CHOICES[rootIndex].midi, SCALES[scaleIndex].intervals);
+
+const packGrid = (g) => g.map((row) => row.map((c) => (c ? 1 : 0)).join("")).join("|");
+const unpackGrid = (s, rows) => {
+  const parsed = (s || "").split("|");
+  if (parsed.length !== rows) return null;
+  return parsed.map((r) => r.split("").map((c) => c === "1"));
+};
 
 function saveState() {
-  const cells = grid.map((row) => row.map((c) => (c ? 1 : 0)).join("")).join("|");
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ cells, bpm, rootIndex }));
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({
+      cells: packGrid(grid),
+      drums: packGrid(drumGrid),
+      bpm,
+      rootIndex,
+      scaleIndex,
+      drumMap,
+    })
+  );
 }
 
 function loadState() {
@@ -21,15 +50,23 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
     const data = JSON.parse(raw);
-    const rows = (data.cells || "").split("|");
-    if (rows.length === ROWS) {
-      grid = rows.map((r) => r.split("").map((c) => c === "1"));
-    }
+    grid = unpackGrid(data.cells, ROWS) ?? grid;
+    drumGrid = unpackGrid(data.drums, DRUM_ROWS) ?? drumGrid;
     if (data.bpm >= 40 && data.bpm <= 240) bpm = data.bpm;
     if (data.rootIndex >= 0 && data.rootIndex < ROOT_CHOICES.length) {
       rootIndex = data.rootIndex;
     }
-    rowNotes = buildRowNotes(ROOT_CHOICES[rootIndex].midi);
+    if (data.scaleIndex >= 0 && data.scaleIndex < SCALES.length) {
+      scaleIndex = data.scaleIndex;
+    }
+    if (
+      Array.isArray(data.drumMap) &&
+      data.drumMap.length === DRUM_ROWS &&
+      data.drumMap.every((n) => Number.isInteger(n) && n >= 0 && n <= 127)
+    ) {
+      drumMap = data.drumMap;
+    }
+    rowNotes = buildRowNotes(ROOT_CHOICES[rootIndex].midi, SCALES[scaleIndex].intervals);
   } catch {
     // Corrupt state: start fresh.
   }
@@ -48,32 +85,66 @@ engine.getNotesForStep = (step) => {
   }
   return notes;
 };
+engine.getDrumsForStep = (step) => {
+  const ids = [];
+  for (let row = 0; row < DRUM_ROWS; row++) {
+    if (drumGrid[row][step]) ids.push(DRUMS[row].id);
+  }
+  return ids;
+};
 
 // ---- Grid UI --------------------------------------------------------------
 
-const gridEl = document.getElementById("grid");
-const cellEls = [];
-
-for (let row = 0; row < ROWS; row++) {
-  cellEls.push([]);
-  for (let step = 0; step < STEPS; step++) {
-    const cell = document.createElement("button");
-    cell.className = "cell";
-    cell.dataset.row = row;
-    cell.dataset.step = step;
-    cell.setAttribute("aria-label", `Row ${row + 1}, step ${step + 1}`);
-    gridEl.appendChild(cell);
-    cellEls[row].push(cell);
+function buildGridUI(el, rows, kind, labelFor) {
+  const cells = [];
+  for (let row = 0; row < rows; row++) {
+    cells.push([]);
+    for (let step = 0; step < STEPS; step++) {
+      const cell = document.createElement("button");
+      cell.className = kind === "drum" ? "cell drum" : "cell";
+      cell.dataset.kind = kind;
+      cell.dataset.row = row;
+      cell.dataset.step = step;
+      cell.title = labelFor(row);
+      cell.setAttribute("aria-label", `${labelFor(row)}, step ${step + 1}`);
+      el.appendChild(cell);
+      cells[row].push(cell);
+    }
   }
+  return cells;
 }
 
-function renderCell(row, step) {
-  cellEls[row][step].classList.toggle("on", grid[row][step]);
+const cellEls = buildGridUI(
+  document.getElementById("grid"),
+  ROWS,
+  "melody",
+  (row) => midiNoteName(rowNotes[row])
+);
+const drumCellEls = buildGridUI(
+  document.getElementById("drum-grid"),
+  DRUM_ROWS,
+  "drum",
+  (row) => DRUMS[row].label
+);
+
+const gridFor = (kind) => (kind === "drum" ? drumGrid : grid);
+const cellsFor = (kind) => (kind === "drum" ? drumCellEls : cellEls);
+
+function renderCell(kind, row, step) {
+  cellsFor(kind)[row][step].classList.toggle("on", gridFor(kind)[row][step]);
 }
 
-function renderGrid() {
+function renderGrids() {
   for (let row = 0; row < ROWS; row++)
-    for (let step = 0; step < STEPS; step++) renderCell(row, step);
+    for (let step = 0; step < STEPS; step++) renderCell("melody", row, step);
+  for (let row = 0; row < DRUM_ROWS; row++)
+    for (let step = 0; step < STEPS; step++) renderCell("drum", row, step);
+}
+
+function refreshMelodyTooltips() {
+  for (let row = 0; row < ROWS; row++) {
+    for (const cell of cellEls[row]) cell.title = midiNoteName(rowNotes[row]);
+  }
 }
 
 // Paint interaction: tap toggles; dragging paints with the value set by the
@@ -83,29 +154,36 @@ let paintValue = true;
 
 function applyPaint(target) {
   if (!target?.classList?.contains("cell")) return;
+  const kind = target.dataset.kind;
   const row = +target.dataset.row;
   const step = +target.dataset.step;
-  if (grid[row][step] === paintValue) return;
-  grid[row][step] = paintValue;
-  renderCell(row, step);
-  if (paintValue) engine.preview(rowNotes[row]);
+  const g = gridFor(kind);
+  if (g[row][step] === paintValue) return;
+  g[row][step] = paintValue;
+  renderCell(kind, row, step);
+  if (paintValue) {
+    if (kind === "drum") engine.previewDrum(DRUMS[row].id);
+    else engine.preview(rowNotes[row]);
+  }
   saveState();
 }
 
-gridEl.addEventListener("pointerdown", (e) => {
-  const cell = e.target.closest(".cell");
-  if (!cell) return;
-  painting = true;
-  paintValue = !grid[+cell.dataset.row][+cell.dataset.step];
-  applyPaint(cell);
-  e.preventDefault();
-});
+for (const el of [document.getElementById("grid"), document.getElementById("drum-grid")]) {
+  el.addEventListener("pointerdown", (e) => {
+    const cell = e.target.closest(".cell");
+    if (!cell) return;
+    painting = true;
+    paintValue = !gridFor(cell.dataset.kind)[+cell.dataset.row][+cell.dataset.step];
+    applyPaint(cell);
+    e.preventDefault();
+  });
+  el.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+}
 window.addEventListener("pointermove", (e) => {
   if (!painting) return;
   applyPaint(document.elementFromPoint(e.clientX, e.clientY));
 });
 window.addEventListener("pointerup", () => (painting = false));
-gridEl.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
 
 // ---- Playhead sync --------------------------------------------------------
 
@@ -130,15 +208,19 @@ function draw() {
 }
 
 function setPlayheadColumn(step) {
-  for (let row = 0; row < ROWS; row++) {
-    for (let s = 0; s < STEPS; s++) {
-      const el = cellEls[row][s];
-      const active = s === step;
-      el.classList.toggle("playhead", active);
-      if (active && grid[row][s]) {
-        el.classList.remove("pulse");
-        void el.offsetWidth; // restart the animation
-        el.classList.add("pulse");
+  for (const kind of ["melody", "drum"]) {
+    const cells = cellsFor(kind);
+    const g = gridFor(kind);
+    for (let row = 0; row < cells.length; row++) {
+      for (let s = 0; s < STEPS; s++) {
+        const el = cells[row][s];
+        const active = s === step;
+        el.classList.toggle("playhead", active);
+        if (active && g[row][s]) {
+          el.classList.remove("pulse");
+          void el.offsetWidth; // restart the animation
+          el.classList.add("pulse");
+        }
       }
     }
   }
@@ -152,12 +234,19 @@ const playBtn = document.getElementById("play");
 const bpmInput = document.getElementById("bpm");
 const bpmLabel = document.getElementById("bpm-label");
 const rootSelect = document.getElementById("root");
+const scaleSelect = document.getElementById("scale");
 
 for (const [i, root] of ROOT_CHOICES.entries()) {
   const opt = document.createElement("option");
   opt.value = i;
-  opt.textContent = `${root.label} pentatonic`;
+  opt.textContent = root.label;
   rootSelect.appendChild(opt);
+}
+for (const [i, scale] of SCALES.entries()) {
+  const opt = document.createElement("option");
+  opt.value = i;
+  opt.textContent = scale.label;
+  scaleSelect.appendChild(opt);
 }
 
 playBtn.addEventListener("click", () => {
@@ -181,21 +270,87 @@ bpmInput.addEventListener("input", () => {
   saveState();
 });
 
+function applyScaleChange() {
+  rowNotes = buildRowNotes(ROOT_CHOICES[rootIndex].midi, SCALES[scaleIndex].intervals);
+  refreshMelodyTooltips();
+  saveState();
+}
+
 rootSelect.addEventListener("change", () => {
   rootIndex = +rootSelect.value;
-  rowNotes = buildRowNotes(ROOT_CHOICES[rootIndex].midi);
-  saveState();
+  applyScaleChange();
+});
+
+scaleSelect.addEventListener("change", () => {
+  scaleIndex = +scaleSelect.value;
+  applyScaleChange();
 });
 
 document.getElementById("clear").addEventListener("click", () => {
-  grid = Array.from({ length: ROWS }, () => Array(STEPS).fill(false));
-  renderGrid();
+  grid = emptyGrid(ROWS);
+  drumGrid = emptyGrid(DRUM_ROWS);
+  renderGrids();
   saveState();
 });
 
 document.getElementById("export").addEventListener("click", () => {
-  const bytes = gridToMidi(grid, rowNotes, STEPS, bpm);
+  const bytes = gridToMidi({
+    melodyGrid: grid,
+    rowNotes,
+    drumGrid,
+    drumNotes: drumMap,
+    steps: STEPS,
+    bpm,
+  });
   downloadMidi(bytes);
+});
+
+// ---- Percussion MIDI mapping panel ----------------------------------------
+
+const drumMapEl = document.getElementById("drum-map");
+const drumMapInputs = [];
+
+for (const [row, drum] of DRUMS.entries()) {
+  const rowEl = document.createElement("label");
+  rowEl.className = "drum-map-row";
+
+  const name = document.createElement("span");
+  name.className = "drum-map-name";
+  name.textContent = drum.label;
+
+  const input = document.createElement("input");
+  input.type = "number";
+  input.min = 0;
+  input.max = 127;
+  input.inputMode = "numeric";
+
+  const noteName = document.createElement("span");
+  noteName.className = "drum-map-note";
+
+  input.addEventListener("change", () => {
+    const value = Math.min(127, Math.max(0, Math.round(+input.value || 0)));
+    input.value = value;
+    drumMap[row] = value;
+    noteName.textContent = midiNoteName(value);
+    saveState();
+  });
+
+  rowEl.append(name, input, noteName);
+  drumMapEl.appendChild(rowEl);
+  drumMapInputs.push({ input, noteName });
+}
+
+function renderDrumMap() {
+  for (const [row, { input, noteName }] of drumMapInputs.entries()) {
+    input.value = drumMap[row];
+    noteName.textContent = midiNoteName(drumMap[row]);
+  }
+}
+
+document.getElementById("drum-map-reset").addEventListener("click", () => {
+  drumMap = defaultDrumMap();
+  renderDrumMap();
+  saveState();
 });
 
 // ---- Init -----------------------------------------------------------------
@@ -205,4 +360,7 @@ engine.bpm = bpm;
 bpmInput.value = bpm;
 bpmLabel.textContent = `${bpm} BPM`;
 rootSelect.value = rootIndex;
-renderGrid();
+scaleSelect.value = scaleIndex;
+refreshMelodyTooltips();
+renderGrids();
+renderDrumMap();
