@@ -1108,6 +1108,14 @@ toolTieBtn.addEventListener("click", () => setTool("tie"));
 
 document.getElementById("clear").addEventListener("click", () => {
   const pat = current();
+  if (
+    !patternIsEmpty(pat) &&
+    !confirm(
+      `Clear pattern ${PATTERN_NAMES[selectedPattern]}? All its notes, ties, and drums will be removed.`
+    )
+  ) {
+    return;
+  }
   pat.tracks = Array.from({ length: TRACK_COUNT }, emptyTrack);
   pat.drumGrid = emptyGrid(DRUM_ROWS);
   renderView();
@@ -1282,6 +1290,7 @@ function renderProjectList() {
     deleteBtn.textContent = "✕";
     deleteBtn.title = "Delete";
     deleteBtn.addEventListener("click", () => {
+      if (!confirm(`Delete project "${name}"? This can't be undone.`)) return;
       const next = readProjects();
       delete next[name];
       writeProjects(next);
@@ -1297,6 +1306,12 @@ document.getElementById("project-save").addEventListener("click", () => {
     `Project ${new Date().toISOString().slice(0, 16).replace("T", " ")}`;
   projectNameInput.value = name;
   const projects = readProjects();
+  if (
+    projects[name] &&
+    !confirm(`A project called "${name}" already exists. Overwrite it with the current state?`)
+  ) {
+    return;
+  }
   projects[name] = buildStateObject();
   writeProjects(projects);
 });
