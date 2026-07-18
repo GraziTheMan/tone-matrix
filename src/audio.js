@@ -10,10 +10,13 @@ const LOOKAHEAD_MS = 25;
 const SCHEDULE_AHEAD = 0.12; // seconds
 
 export class AudioEngine {
-  constructor({ steps, onStep }) {
-    this.steps = steps;
+  constructor({ onStep }) {
     this.onStep = onStep; // (step, audioTime) => void, for UI sync
     this.bpm = 120;
+    this.patternLength = 16;
+    // Swing ratio: 0.5 = straight, up to 0.75 = heavy triplet swing. Offbeat
+    // 16ths are delayed; the grid/playhead itself stays straight.
+    this.swing = 0.5;
     this.ctx = null;
     this.master = null;
     this.delay = null;
@@ -22,9 +25,10 @@ export class AudioEngine {
     this.nextNoteTime = 0;
     this.playing = false;
     this.noiseBuffer = null;
-    // Set by the app each tick: (step) => array of MIDI notes to play.
+    // Set by the app: (step) => [{ midi, velocity, durSteps }] note STARTS
+    // only — tied continuations must not appear here.
     this.getNotesForStep = () => [];
-    // (step) => array of drum ids ("kick", "snare", ...) to play.
+    // (step) => [{ id, velocity }] with id in "kick" | "snare" | ...
     this.getDrumsForStep = () => [];
   }
 
@@ -54,6 +58,10 @@ export class AudioEngine {
     return 60 / this.bpm / 4;
   }
 
+  swingDelay() {
+    return (this.swing - 0.5) * 2 * this.secondsPerStep();
+  }
+
   start() {
     this.ensureContext();
     if (this.ctx.state === "suspended") this.ctx.resume();
@@ -73,30 +81,42 @@ export class AudioEngine {
   schedule() {
     while (this.nextNoteTime < this.ctx.currentTime + SCHEDULE_AHEAD) {
       const step = this.currentStep;
-      const when = this.nextNoteTime;
-      for (const midi of this.getNotesForStep(step)) {
-        this.playNote(midi, when);
+      const when = this.nextNoteTime + (step % 2 ? this.swingDelay() : 0);
+      for (const n of this.getNotesForStep(step)) {
+        this.playNote(n.midi, when, n.velocity, n.durSteps);
       }
-      for (const drum of this.getDrumsForStep(step)) {
-        this.playDrum(drum, when);
+      for (const d of this.getDrumsForStep(step)) {
+        this.playDrum(d.id, when, d.velocity);
       }
-      this.onStep(step, when);
+      this.onStep(step, this.nextNoteTime);
       this.nextNoteTime += this.secondsPerStep();
-      this.currentStep = (this.currentStep + 1) % this.steps;
+      this.currentStep = (this.currentStep + 1) % this.patternLength;
     }
   }
 
-  // A bell-ish voice: sine fundamental + quiet octave partial, sharp attack,
-  // exponential decay.
-  playNote(midi, when, velocity = 1) {
+  // A bell-ish voice: sine fundamental + quiet octave partial, sharp attack.
+  // Single steps get the classic exponential-decay pluck; tied notes sustain
+  // for their full length before releasing.
+  playNote(midi, when, velocity = 0.7, durSteps = 1) {
     const ctx = this.ctx;
     const freq = midiToFreq(midi);
-    const dur = Math.max(0.35, this.secondsPerStep() * 3);
+    const stepDur = this.secondsPerStep();
+    const peak = 0.32 * velocity;
+    const release = 0.35;
+    let end;
 
     const env = ctx.createGain();
     env.gain.setValueAtTime(0.0001, when);
-    env.gain.exponentialRampToValueAtTime(0.28 * velocity, when + 0.008);
-    env.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    env.gain.exponentialRampToValueAtTime(peak, when + 0.008);
+    if (durSteps <= 1) {
+      end = when + Math.max(0.35, stepDur * 3);
+      env.gain.exponentialRampToValueAtTime(0.0001, end);
+    } else {
+      const hold = stepDur * durSteps;
+      env.gain.exponentialRampToValueAtTime(peak * 0.45, when + hold);
+      end = when + hold + release;
+      env.gain.exponentialRampToValueAtTime(0.0001, end);
+    }
 
     const osc = ctx.createOscillator();
     osc.type = "sine";
@@ -116,21 +136,21 @@ export class AudioEngine {
 
     osc.start(when);
     partial.start(when);
-    osc.stop(when + dur + 0.05);
-    partial.stop(when + dur + 0.05);
+    osc.stop(end + 0.05);
+    partial.stop(end + 0.05);
   }
 
   // Immediate one-shot preview when the user paints a cell.
-  preview(midi) {
+  preview(midi, velocity = 0.7, durSteps = 1) {
     this.ensureContext();
     if (this.ctx.state === "suspended") this.ctx.resume();
-    this.playNote(midi, this.ctx.currentTime, 0.8);
+    this.playNote(midi, this.ctx.currentTime, velocity, durSteps);
   }
 
-  previewDrum(id) {
+  previewDrum(id, velocity = 0.7) {
     this.ensureContext();
     if (this.ctx.state === "suspended") this.ctx.resume();
-    this.playDrum(id, this.ctx.currentTime);
+    this.playDrum(id, this.ctx.currentTime, velocity);
   }
 
   getNoiseBuffer() {
@@ -161,15 +181,17 @@ export class AudioEngine {
   }
 
   // Synthesized drum kit, kept dry (no delay send) so the groove stays tight.
-  playDrum(id, when) {
+  // Gains are tuned for velocity 0.7; accents scale up from there.
+  playDrum(id, when, velocity = 0.7) {
     const ctx = this.ctx;
+    const v = velocity / 0.7;
     switch (id) {
       case "kick": {
         const osc = ctx.createOscillator();
         osc.frequency.setValueAtTime(150, when);
         osc.frequency.exponentialRampToValueAtTime(45, when + 0.11);
         const env = ctx.createGain();
-        env.gain.setValueAtTime(0.85, when);
+        env.gain.setValueAtTime(Math.min(0.85 * v, 1.1), when);
         env.gain.exponentialRampToValueAtTime(0.0001, when + 0.3);
         osc.connect(env);
         env.connect(this.master);
@@ -178,12 +200,12 @@ export class AudioEngine {
         break;
       }
       case "snare": {
-        this.noiseSource(when, 0.18, { type: "bandpass", freq: 1800, gain: 0.5 });
+        this.noiseSource(when, 0.18, { type: "bandpass", freq: 1800, gain: 0.5 * v });
         const body = ctx.createOscillator();
         body.type = "triangle";
         body.frequency.value = 185;
         const env = ctx.createGain();
-        env.gain.setValueAtTime(0.35, when);
+        env.gain.setValueAtTime(0.35 * v, when);
         env.gain.exponentialRampToValueAtTime(0.0001, when + 0.12);
         body.connect(env);
         env.connect(this.master);
@@ -192,10 +214,10 @@ export class AudioEngine {
         break;
       }
       case "hatClosed":
-        this.noiseSource(when, 0.05, { type: "highpass", freq: 7000, gain: 0.3 });
+        this.noiseSource(when, 0.05, { type: "highpass", freq: 7000, gain: 0.3 * v });
         break;
       case "hatOpen":
-        this.noiseSource(when, 0.32, { type: "highpass", freq: 6500, gain: 0.26 });
+        this.noiseSource(when, 0.32, { type: "highpass", freq: 6500, gain: 0.26 * v });
         break;
     }
   }

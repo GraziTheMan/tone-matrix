@@ -99,7 +99,7 @@ body {
   color: var(--accent);
 }
 
-.tempo {
+.slider {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -107,9 +107,85 @@ body {
   color: var(--muted);
 }
 
-.tempo input {
-  width: 110px;
+.slider span {
+  min-width: 74px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.slider input {
+  width: 100px;
   accent-color: var(--on);
+}
+
+.btn-group {
+  display: inline-flex;
+}
+
+.btn-group .btn {
+  border-radius: 0;
+}
+
+.btn-group .btn:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.btn-group .btn:last-child {
+  border-radius: 0 8px 8px 0;
+  border-left: none;
+}
+
+.btn.active {
+  background: var(--on);
+  border-color: var(--on);
+  color: #06262b;
+  font-weight: 600;
+}
+
+.btn.active:hover {
+  background: #6fdbe9;
+}
+
+.pages {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.page-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.tab {
+  background: var(--panel);
+  color: var(--muted);
+  border: 1px solid #223044;
+  border-radius: 8px;
+  min-width: 40px;
+  padding: 6px 0;
+  font-size: 0.85rem;
+  cursor: pointer;
+  position: relative;
+}
+
+.tab.active {
+  background: var(--cell-hover);
+  color: var(--text);
+  border-color: var(--on);
+}
+
+.tab.playing::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--on);
+  box-shadow: 0 0 6px var(--on-glow);
 }
 
 #root {
@@ -136,6 +212,7 @@ body {
 }
 
 .cell {
+  position: relative;
   border: none;
   border-radius: 18%;
   background: var(--cell);
@@ -143,6 +220,10 @@ body {
   padding: 0;
   transition: background 0.12s;
   -webkit-tap-highlight-color: transparent;
+}
+
+.grid.tie-mode .cell {
+  cursor: crosshair;
 }
 
 .cell:hover {
@@ -161,6 +242,39 @@ body {
 .cell.drum.on {
   background: var(--accent);
   box-shadow: 0 0 10px var(--accent-glow);
+}
+
+/* Accented cells read brighter with a white inner ring. */
+.cell.on.accent {
+  box-shadow: 0 0 16px var(--on-glow), inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+  filter: brightness(1.2);
+}
+
+.cell.drum.on.accent {
+  box-shadow: 0 0 16px var(--accent-glow), inset 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+/* Tied melody notes connect across the grid gap into one visual bar. */
+.cell.on.tie-right {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.cell.on.tie-left {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.cell.on.tie-right::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  top: 18%;
+  height: 64%;
+  width: clamp(3px, 0.8vw, 6px);
+  background: var(--on);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .cell.on.pulse {

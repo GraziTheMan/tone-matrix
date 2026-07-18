@@ -4,7 +4,9 @@
 // the seven-note scales trade a little of that safety for stronger flavor.
 
 export const ROWS = 16;
-export const STEPS = 16;
+export const VIEW_COLS = 16; // columns visible at once (one page)
+export const MAX_STEPS = 64;
+export const PATTERN_LENGTHS = [16, 32, 64];
 
 export const SCALES = [
   { label: "Major Pentatonic", intervals: [0, 2, 4, 7, 9] },

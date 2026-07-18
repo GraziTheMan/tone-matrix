@@ -1,6 +1,8 @@
 import {
   ROWS,
-  STEPS,
+  VIEW_COLS,
+  MAX_STEPS,
+  PATTERN_LENGTHS,
   SCALES,
   ROOT_CHOICES,
   buildRowNotes,
@@ -11,24 +13,47 @@ import { AudioEngine } from "./audio.js";
 import { gridToMidi, downloadMidi } from "./midi.js";
 
 const STORAGE_KEY = "tone-matrix-state";
+const HOLD_MS = 400; // press-and-hold this long to accent a cell
+
+// Cell values: 0 = off, 1 = on, 2 = accented. Audio velocities per value:
+const VEL = { 1: 0.7, 2: 1.0 };
 
 // ---- State ----------------------------------------------------------------
 
-const emptyGrid = (rows) => Array.from({ length: rows }, () => Array(STEPS).fill(false));
+const emptyGrid = (rows, fill = 0) =>
+  Array.from({ length: rows }, () => Array(MAX_STEPS).fill(fill));
 
 let grid = emptyGrid(ROWS);
 let drumGrid = emptyGrid(DRUM_ROWS);
+// tieGrid[row][step] = true joins the melody note at `step` to `step + 1`.
+let tieGrid = emptyGrid(ROWS, false);
 let bpm = 120;
+let swing = 50; // percent, 50 = straight … 75 = heavy
 let rootIndex = 0;
 let scaleIndex = 0;
+let patternLength = 16;
 let drumMap = defaultDrumMap();
 let rowNotes = buildRowNotes(ROOT_CHOICES[rootIndex].midi, SCALES[scaleIndex].intervals);
 
-const packGrid = (g) => g.map((row) => row.map((c) => (c ? 1 : 0)).join("")).join("|");
+let viewPage = 0;
+let playingPage = 0;
+let follow = true;
+let tool = "draw"; // "draw" | "tie"
+
+const pageCount = () => patternLength / VIEW_COLS;
+const stepOf = (col) => viewPage * VIEW_COLS + col;
+
+const packGrid = (g) => g.map((row) => row.map((c) => +c).join("")).join("|");
 const unpackGrid = (s, rows) => {
   const parsed = (s || "").split("|");
   if (parsed.length !== rows) return null;
-  return parsed.map((r) => r.split("").map((c) => c === "1"));
+  return parsed.map((r) => {
+    const out = Array(MAX_STEPS).fill(0);
+    for (let i = 0; i < Math.min(r.length, MAX_STEPS); i++) {
+      out[i] = Math.min(2, Math.max(0, +r[i] || 0));
+    }
+    return out;
+  });
 };
 
 function saveState() {
@@ -36,10 +61,13 @@ function saveState() {
     STORAGE_KEY,
     JSON.stringify({
       cells: packGrid(grid),
+      ties: packGrid(tieGrid),
       drums: packGrid(drumGrid),
       bpm,
+      swing,
       rootIndex,
       scaleIndex,
+      patternLength,
       drumMap,
     })
   );
@@ -52,12 +80,18 @@ function loadState() {
     const data = JSON.parse(raw);
     grid = unpackGrid(data.cells, ROWS) ?? grid;
     drumGrid = unpackGrid(data.drums, DRUM_ROWS) ?? drumGrid;
+    const ties = unpackGrid(data.ties, ROWS);
+    if (ties) tieGrid = ties.map((row) => row.map((v) => v === 1));
     if (data.bpm >= 40 && data.bpm <= 240) bpm = data.bpm;
+    if (data.swing >= 50 && data.swing <= 75) swing = data.swing;
     if (data.rootIndex >= 0 && data.rootIndex < ROOT_CHOICES.length) {
       rootIndex = data.rootIndex;
     }
     if (data.scaleIndex >= 0 && data.scaleIndex < SCALES.length) {
       scaleIndex = data.scaleIndex;
+    }
+    if (PATTERN_LENGTHS.includes(data.patternLength)) {
+      patternLength = data.patternLength;
     }
     if (
       Array.isArray(data.drumMap) &&
@@ -75,22 +109,45 @@ function loadState() {
 // ---- Audio ----------------------------------------------------------------
 
 const engine = new AudioEngine({
-  steps: STEPS,
   onStep: (step, when) => stepQueue.push({ step, when }),
 });
+
+// Length of the note starting at `step` in 16ths (1 when untied).
+function noteLength(row, step) {
+  let end = step;
+  while (end < patternLength - 1 && tieGrid[row][end] && grid[row][end + 1]) end++;
+  return end - step + 1;
+}
+
+// A step is a note START unless it continues a tie from the previous step.
+function isNoteStart(row, step) {
+  return (
+    grid[row][step] > 0 &&
+    !(step > 0 && tieGrid[row][step - 1] && grid[row][step - 1] > 0)
+  );
+}
+
 engine.getNotesForStep = (step) => {
   const notes = [];
   for (let row = 0; row < ROWS; row++) {
-    if (grid[row][step]) notes.push(rowNotes[row]);
+    if (isNoteStart(row, step)) {
+      notes.push({
+        midi: rowNotes[row],
+        velocity: VEL[grid[row][step]],
+        durSteps: noteLength(row, step),
+      });
+    }
   }
   return notes;
 };
 engine.getDrumsForStep = (step) => {
-  const ids = [];
+  const hits = [];
   for (let row = 0; row < DRUM_ROWS; row++) {
-    if (drumGrid[row][step]) ids.push(DRUMS[row].id);
+    if (drumGrid[row][step]) {
+      hits.push({ id: DRUMS[row].id, velocity: VEL[drumGrid[row][step]] });
+    }
   }
-  return ids;
+  return hits;
 };
 
 // ---- Grid UI --------------------------------------------------------------
@@ -99,14 +156,14 @@ function buildGridUI(el, rows, kind, labelFor) {
   const cells = [];
   for (let row = 0; row < rows; row++) {
     cells.push([]);
-    for (let step = 0; step < STEPS; step++) {
+    for (let col = 0; col < VIEW_COLS; col++) {
       const cell = document.createElement("button");
       cell.className = kind === "drum" ? "cell drum" : "cell";
       cell.dataset.kind = kind;
       cell.dataset.row = row;
-      cell.dataset.step = step;
+      cell.dataset.col = col;
       cell.title = labelFor(row);
-      cell.setAttribute("aria-label", `${labelFor(row)}, step ${step + 1}`);
+      cell.setAttribute("aria-label", `${labelFor(row)}, column ${col + 1}`);
       el.appendChild(cell);
       cells[row].push(cell);
     }
@@ -130,15 +187,32 @@ const drumCellEls = buildGridUI(
 const gridFor = (kind) => (kind === "drum" ? drumGrid : grid);
 const cellsFor = (kind) => (kind === "drum" ? drumCellEls : cellEls);
 
-function renderCell(kind, row, step) {
-  cellsFor(kind)[row][step].classList.toggle("on", gridFor(kind)[row][step]);
-}
-
-function renderGrids() {
-  for (let row = 0; row < ROWS; row++)
-    for (let step = 0; step < STEPS; step++) renderCell("melody", row, step);
-  for (let row = 0; row < DRUM_ROWS; row++)
-    for (let step = 0; step < STEPS; step++) renderCell("drum", row, step);
+// Re-render every visible cell for the current page (cheap: ~320 nodes).
+function renderView() {
+  for (const kind of ["melody", "drum"]) {
+    const g = gridFor(kind);
+    const cells = cellsFor(kind);
+    for (let row = 0; row < cells.length; row++) {
+      for (let col = 0; col < VIEW_COLS; col++) {
+        const step = stepOf(col);
+        const el = cells[row][col];
+        const value = g[row][step];
+        el.classList.toggle("on", value > 0);
+        el.classList.toggle("accent", value === 2);
+        if (kind === "melody") {
+          const tiedRight =
+            value > 0 &&
+            tieGrid[row][step] &&
+            step + 1 < patternLength &&
+            g[row][step + 1] > 0;
+          const tiedLeft =
+            value > 0 && step > 0 && tieGrid[row][step - 1] && g[row][step - 1] > 0;
+          el.classList.toggle("tie-right", tiedRight);
+          el.classList.toggle("tie-left", tiedLeft);
+        }
+      }
+    }
+  }
 }
 
 function refreshMelodyTooltips() {
@@ -147,43 +221,140 @@ function refreshMelodyTooltips() {
   }
 }
 
-// Paint interaction: tap toggles; dragging paints with the value set by the
-// first cell touched, so a stroke doesn't flicker cells on and off.
-let painting = false;
-let paintValue = true;
-
-function applyPaint(target) {
-  if (!target?.classList?.contains("cell")) return;
-  const kind = target.dataset.kind;
-  const row = +target.dataset.row;
-  const step = +target.dataset.step;
-  const g = gridFor(kind);
-  if (g[row][step] === paintValue) return;
-  g[row][step] = paintValue;
-  renderCell(kind, row, step);
-  if (paintValue) {
-    if (kind === "drum") engine.previewDrum(DRUMS[row].id);
-    else engine.preview(rowNotes[row]);
+function previewCell(kind, row, step) {
+  if (kind === "drum") {
+    engine.previewDrum(DRUMS[row].id, VEL[drumGrid[row][step]]);
+  } else {
+    engine.preview(rowNotes[row], VEL[grid[row][step]], noteLength(row, step));
   }
+}
+
+// ---- Paint interaction ----------------------------------------------------
+//
+// Draw tool: tap toggles a cell; press-and-hold accents it (hold an accented
+// cell to un-accent). Toggling OFF is deferred to pointerup so holding an
+// active cell accents instead of erasing. Dragging paints with the value
+// implied by the first cell touched.
+//
+// Tie tool (melody only): tap or drag across a note to join/split it with
+// its right-hand neighbour.
+
+let painting = false;
+let paintMode = null; // "draw" | "erase" | "tie" | "untie"
+let holdTimer = null;
+let pendingOff = null; // cell awaiting toggle-off on pointerup
+let downKey = null; // "kind:row:step" of the initial cell
+
+const cellInfo = (target) => {
+  if (!target?.classList?.contains("cell")) return null;
+  return {
+    kind: target.dataset.kind,
+    row: +target.dataset.row,
+    step: stepOf(+target.dataset.col),
+  };
+};
+
+function cancelHold() {
+  if (holdTimer) clearTimeout(holdTimer);
+  holdTimer = null;
+}
+
+function applyTie(row, step, wantTie) {
+  if (step >= patternLength - 1) return;
+  if (wantTie && !(grid[row][step] && grid[row][step + 1])) return;
+  if (tieGrid[row][step] === wantTie) return;
+  tieGrid[row][step] = wantTie;
+  renderView();
+  if (wantTie) previewCell("melody", row, step);
   saveState();
 }
 
+function applyDraw(info, value) {
+  const g = gridFor(info.kind);
+  if (!!g[info.row][info.step] === !!value) return;
+  g[info.row][info.step] = value;
+  renderView();
+  if (value) previewCell(info.kind, info.row, info.step);
+  saveState();
+}
+
+function onPointerDown(e) {
+  const info = cellInfo(e.target.closest(".cell"));
+  if (!info) return;
+  e.preventDefault();
+  painting = true;
+  downKey = `${info.kind}:${info.row}:${info.step}`;
+
+  if (tool === "tie") {
+    if (info.kind !== "melody") return;
+    paintMode = tieGrid[info.row][info.step] ? "untie" : "tie";
+    applyTie(info.row, info.step, paintMode === "tie");
+    return;
+  }
+
+  const g = gridFor(info.kind);
+  const current = g[info.row][info.step];
+  if (current > 0) {
+    // Defer the toggle-off; a hold accents instead.
+    paintMode = "erase";
+    pendingOff = info;
+    holdTimer = setTimeout(() => {
+      holdTimer = null;
+      pendingOff = null;
+      painting = false;
+      g[info.row][info.step] = current === 2 ? 1 : 2;
+      renderView();
+      previewCell(info.kind, info.row, info.step);
+      saveState();
+    }, HOLD_MS);
+  } else {
+    paintMode = "draw";
+    applyDraw(info, 1);
+    holdTimer = setTimeout(() => {
+      holdTimer = null;
+      painting = false;
+      g[info.row][info.step] = 2;
+      renderView();
+      previewCell(info.kind, info.row, info.step);
+      saveState();
+    }, HOLD_MS);
+  }
+}
+
+function onPointerMove(e) {
+  if (!painting) return;
+  const info = cellInfo(document.elementFromPoint(e.clientX, e.clientY));
+  if (!info || `${info.kind}:${info.row}:${info.step}` === downKey) return;
+  // Leaving the initial cell turns this into a drag: no accent, and a
+  // pending toggle-off commits as the start of an erase stroke.
+  cancelHold();
+  if (pendingOff) {
+    applyDraw(pendingOff, 0);
+    pendingOff = null;
+  }
+  if (paintMode === "tie" || paintMode === "untie") {
+    if (info.kind === "melody") applyTie(info.row, info.step, paintMode === "tie");
+  } else {
+    applyDraw(info, paintMode === "draw" ? 1 : 0);
+  }
+}
+
+function onPointerUp() {
+  cancelHold();
+  if (pendingOff) {
+    applyDraw(pendingOff, 0);
+    pendingOff = null;
+  }
+  painting = false;
+  downKey = null;
+}
+
 for (const el of [document.getElementById("grid"), document.getElementById("drum-grid")]) {
-  el.addEventListener("pointerdown", (e) => {
-    const cell = e.target.closest(".cell");
-    if (!cell) return;
-    painting = true;
-    paintValue = !gridFor(cell.dataset.kind)[+cell.dataset.row][+cell.dataset.step];
-    applyPaint(cell);
-    e.preventDefault();
-  });
+  el.addEventListener("pointerdown", onPointerDown);
   el.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
 }
-window.addEventListener("pointermove", (e) => {
-  if (!painting) return;
-  applyPaint(document.elementFromPoint(e.clientX, e.clientY));
-});
-window.addEventListener("pointerup", () => (painting = false));
+window.addEventListener("pointermove", onPointerMove);
+window.addEventListener("pointerup", onPointerUp);
 
 // ---- Playhead sync --------------------------------------------------------
 
@@ -200,23 +371,30 @@ function draw() {
       next = stepQueue.shift();
     }
     if (next && next.step !== drawnStep) {
-      setPlayheadColumn(engine.playing ? next.step : -1);
       drawnStep = next.step;
+      const page = Math.floor(next.step / VIEW_COLS);
+      if (page !== playingPage) {
+        playingPage = page;
+        updatePageTabs();
+        if (follow && viewPage !== page) setViewPage(page, { keepFollow: true });
+      }
+      setPlayheadColumn(engine.playing ? next.step : -1);
     }
   }
   requestAnimationFrame(draw);
 }
 
 function setPlayheadColumn(step) {
+  const col = step >= 0 ? step - viewPage * VIEW_COLS : -1;
   for (const kind of ["melody", "drum"]) {
     const cells = cellsFor(kind);
     const g = gridFor(kind);
     for (let row = 0; row < cells.length; row++) {
-      for (let s = 0; s < STEPS; s++) {
-        const el = cells[row][s];
-        const active = s === step;
+      for (let c = 0; c < VIEW_COLS; c++) {
+        const el = cells[row][c];
+        const active = c === col && col >= 0 && col < VIEW_COLS;
         el.classList.toggle("playhead", active);
-        if (active && g[row][s]) {
+        if (active && g[row][stepOf(c)]) {
           el.classList.remove("pulse");
           void el.offsetWidth; // restart the animation
           el.classList.add("pulse");
@@ -228,13 +406,62 @@ function setPlayheadColumn(step) {
 
 requestAnimationFrame(draw);
 
+// ---- Pages ----------------------------------------------------------------
+
+const pagesEl = document.getElementById("pages");
+const pageTabsEl = document.getElementById("page-tabs");
+const followBtn = document.getElementById("follow");
+
+function setViewPage(page, { keepFollow = false } = {}) {
+  viewPage = page;
+  if (!keepFollow) setFollow(false);
+  updatePageTabs();
+  renderView();
+  setPlayheadColumn(engine.playing ? drawnStep : -1);
+}
+
+function setFollow(value) {
+  follow = value;
+  followBtn.classList.toggle("active", follow);
+  followBtn.setAttribute("aria-pressed", String(follow));
+}
+
+function updatePageTabs() {
+  const tabs = pageTabsEl.children;
+  for (let i = 0; i < tabs.length; i++) {
+    tabs[i].classList.toggle("active", i === viewPage);
+    tabs[i].classList.toggle("playing", engine.playing && i === playingPage);
+  }
+}
+
+function rebuildPageTabs() {
+  pageTabsEl.replaceChildren();
+  const pages = pageCount();
+  pagesEl.hidden = pages <= 1;
+  for (let i = 0; i < pages; i++) {
+    const tab = document.createElement("button");
+    tab.className = "tab";
+    tab.textContent = i + 1;
+    tab.addEventListener("click", () => setViewPage(i));
+    pageTabsEl.appendChild(tab);
+  }
+  updatePageTabs();
+}
+
+followBtn.addEventListener("click", () => setFollow(!follow));
+
 // ---- Controls -------------------------------------------------------------
 
 const playBtn = document.getElementById("play");
 const bpmInput = document.getElementById("bpm");
 const bpmLabel = document.getElementById("bpm-label");
+const swingInput = document.getElementById("swing");
+const swingLabel = document.getElementById("swing-label");
 const rootSelect = document.getElementById("root");
 const scaleSelect = document.getElementById("scale");
+const lengthSelect = document.getElementById("length");
+const toolDrawBtn = document.getElementById("tool-draw");
+const toolTieBtn = document.getElementById("tool-tie");
 
 for (const [i, root] of ROOT_CHOICES.entries()) {
   const opt = document.createElement("option");
@@ -253,7 +480,9 @@ playBtn.addEventListener("click", () => {
   if (engine.playing) {
     engine.stop();
     stepQueue.length = 0;
+    drawnStep = -1;
     setPlayheadColumn(-1);
+    updatePageTabs();
     playBtn.textContent = "Play";
     playBtn.setAttribute("aria-pressed", "false");
   } else {
@@ -267,6 +496,13 @@ bpmInput.addEventListener("input", () => {
   bpm = +bpmInput.value;
   engine.bpm = bpm;
   bpmLabel.textContent = `${bpm} BPM`;
+  saveState();
+});
+
+swingInput.addEventListener("input", () => {
+  swing = +swingInput.value;
+  engine.swing = swing / 100;
+  swingLabel.textContent = `Swing ${swing}%`;
   saveState();
 });
 
@@ -286,21 +522,45 @@ scaleSelect.addEventListener("change", () => {
   applyScaleChange();
 });
 
+lengthSelect.addEventListener("change", () => {
+  patternLength = +lengthSelect.value;
+  engine.patternLength = patternLength;
+  if (viewPage >= pageCount()) viewPage = 0;
+  rebuildPageTabs();
+  renderView();
+  saveState();
+});
+
+function setTool(next) {
+  tool = next;
+  toolDrawBtn.classList.toggle("active", tool === "draw");
+  toolDrawBtn.setAttribute("aria-pressed", String(tool === "draw"));
+  toolTieBtn.classList.toggle("active", tool === "tie");
+  toolTieBtn.setAttribute("aria-pressed", String(tool === "tie"));
+  document.getElementById("grid").classList.toggle("tie-mode", tool === "tie");
+}
+
+toolDrawBtn.addEventListener("click", () => setTool("draw"));
+toolTieBtn.addEventListener("click", () => setTool("tie"));
+
 document.getElementById("clear").addEventListener("click", () => {
   grid = emptyGrid(ROWS);
   drumGrid = emptyGrid(DRUM_ROWS);
-  renderGrids();
+  tieGrid = emptyGrid(ROWS, false);
+  renderView();
   saveState();
 });
 
 document.getElementById("export").addEventListener("click", () => {
   const bytes = gridToMidi({
     melodyGrid: grid,
+    tieGrid,
     rowNotes,
     drumGrid,
     drumNotes: drumMap,
-    steps: STEPS,
+    steps: patternLength,
     bpm,
+    swing: swing / 100,
   });
   downloadMidi(bytes);
 });
@@ -357,10 +617,18 @@ document.getElementById("drum-map-reset").addEventListener("click", () => {
 
 loadState();
 engine.bpm = bpm;
+engine.swing = swing / 100;
+engine.patternLength = patternLength;
 bpmInput.value = bpm;
 bpmLabel.textContent = `${bpm} BPM`;
+swingInput.value = swing;
+swingLabel.textContent = `Swing ${swing}%`;
 rootSelect.value = rootIndex;
 scaleSelect.value = scaleIndex;
+lengthSelect.value = patternLength;
+setTool("draw");
+setFollow(true);
 refreshMelodyTooltips();
-renderGrids();
+rebuildPageTabs();
+renderView();
 renderDrumMap();

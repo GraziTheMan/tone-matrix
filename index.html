@@ -17,16 +17,37 @@
         <h1>Tone&nbsp;Matrix</h1>
         <div class="controls">
           <button id="play" class="btn btn-primary" aria-pressed="false">Play</button>
-          <label class="tempo">
+          <label class="slider">
             <span id="bpm-label">120 BPM</span>
             <input id="bpm" type="range" min="40" max="240" step="1" value="120" />
           </label>
-          <select id="root" title="Root note"></select>
-          <select id="scale" title="Scale"></select>
-          <button id="clear" class="btn">Clear</button>
+          <label class="slider">
+            <span id="swing-label">Swing 50%</span>
+            <input id="swing" type="range" min="50" max="75" step="1" value="50" />
+          </label>
           <button id="export" class="btn btn-accent">Export MIDI</button>
         </div>
+        <div class="controls">
+          <select id="root" title="Root note"></select>
+          <select id="scale" title="Scale"></select>
+          <select id="length" title="Pattern length">
+            <option value="16">16 steps</option>
+            <option value="32">32 steps</option>
+            <option value="64">64 steps</option>
+          </select>
+          <div class="btn-group" role="group" aria-label="Edit tool">
+            <button id="tool-draw" class="btn active" aria-pressed="true">Draw</button>
+            <button id="tool-tie" class="btn" aria-pressed="false">Tie</button>
+          </div>
+          <button id="clear" class="btn">Clear</button>
+        </div>
       </header>
+      <div id="pages" class="pages" hidden>
+        <div id="page-tabs" class="page-tabs"></div>
+        <button id="follow" class="btn btn-small active" aria-pressed="true" title="Follow the playhead across pages">
+          Follow
+        </button>
+      </div>
       <div id="grid" class="grid" role="grid" aria-label="Melody grid"></div>
       <div id="drum-grid" class="grid drum-grid" role="grid" aria-label="Percussion grid"></div>
       <details class="settings">
@@ -40,8 +61,9 @@
         <button id="drum-map-reset" class="btn btn-small">Reset to General MIDI</button>
       </details>
       <footer class="hint">
-        Tap or drag to paint &middot; top grid is melody, bottom is drums &middot;
-        your pattern is saved automatically
+        Tap or drag to paint &middot; press and hold a note to accent it &middot;
+        the Tie tool joins a note to its right-hand neighbour for longer notes
+        &middot; everything is saved automatically
       </footer>
     </main>
     <script type="module" src="/src/main.js"></script>
