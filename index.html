@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#0b0f14" />
+    <title>Tone Matrix</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230b0f14'/%3E%3Crect x='2' y='8' width='4' height='4' rx='1' fill='%234dd0e1'/%3E%3Crect x='7' y='3' width='4' height='4' rx='1' fill='%234dd0e1'/%3E%3Crect x='10' y='9' width='4' height='4' rx='1' fill='%23ffb74d'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="toolbar">
+        <h1>Tone&nbsp;Matrix</h1>
+        <div class="controls">
+          <button id="play" class="btn btn-primary" aria-pressed="false">Play</button>
+          <label class="tempo">
+            <span id="bpm-label">120 BPM</span>
+            <input id="bpm" type="range" min="40" max="240" step="1" value="120" />
+          </label>
+          <select id="root" title="Root note"></select>
+          <button id="clear" class="btn">Clear</button>
+          <button id="export" class="btn btn-accent">Export MIDI</button>
+        </div>
+      </header>
+      <div id="grid" class="grid" role="grid" aria-label="Step sequencer grid"></div>
+      <footer class="hint">
+        Tap or drag to paint notes &middot; every combination is in key &middot; your
+        pattern is saved automatically
+      </footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

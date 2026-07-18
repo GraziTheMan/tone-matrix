@@ -1,0 +1,170 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #121821;
+  --cell: #1b2431;
+  --cell-hover: #263243;
+  --on: #4dd0e1;
+  --on-glow: rgba(77, 208, 225, 0.55);
+  --playhead: rgba(255, 255, 255, 0.07);
+  --text: #dce6f2;
+  --muted: #7b8a9d;
+  --accent: #ffb74d;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: radial-gradient(1200px 800px at 50% -10%, #141d29, var(--bg));
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: manipulation;
+}
+
+.app {
+  width: min(94vw, 640px);
+  padding: 16px 0 24px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.toolbar h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: auto;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #223044;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn:hover {
+  background: var(--cell-hover);
+}
+
+.btn-primary {
+  background: var(--on);
+  border-color: var(--on);
+  color: #06262b;
+  font-weight: 600;
+  min-width: 68px;
+}
+
+.btn-primary:hover {
+  background: #6fdbe9;
+}
+
+.btn-accent {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.tempo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.tempo input {
+  width: 110px;
+  accent-color: var(--on);
+}
+
+#root {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #223044;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: clamp(2px, 0.6vw, 5px);
+  aspect-ratio: 1;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.cell {
+  border: none;
+  border-radius: 18%;
+  background: var(--cell);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cell:hover {
+  background: var(--cell-hover);
+}
+
+.cell.playhead {
+  box-shadow: inset 0 0 0 100px var(--playhead);
+}
+
+.cell.on {
+  background: var(--on);
+  box-shadow: 0 0 10px var(--on-glow);
+}
+
+.cell.on.pulse {
+  animation: pulse 0.45s ease-out;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 22px 6px var(--on-glow);
+    filter: brightness(1.9);
+  }
+  100% {
+    box-shadow: 0 0 10px var(--on-glow);
+    filter: brightness(1);
+  }
+}
+
+.hint {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
