@@ -11,14 +11,16 @@ const TAIL = 2.0; // room for the delay/release to ring out
 
 export async function renderSongToWav({
   segments,
-  rowNotes,
+  trackNotes,
+  trackInstruments,
   bpm,
   swing = 0.5,
   melodyAudible,
   drumAudible,
+  trackAudible,
   sampleRate = 44100,
 }) {
-  const song = collectSong(segments, { melodyAudible, drumAudible });
+  const song = collectSong(segments, { melodyAudible, drumAudible, trackAudible });
   const stepDur = 60 / bpm / 4;
   const swingDelay = (swing - 0.5) * 2 * stepDur;
   const timeOf = (step) => LEAD_IN + step * stepDur + (step % 2 ? swingDelay : 0);
@@ -29,11 +31,12 @@ export async function renderSongToWav({
 
   for (const n of song.melody) {
     playNote(chain, {
-      midi: rowNotes[n.row],
+      midi: trackNotes[n.track][n.row],
       when: timeOf(n.step),
       velocity: AUDIO_VELOCITY[n.value] ?? AUDIO_VELOCITY[1],
       durSteps: n.durSteps,
       stepDur,
+      instrument: trackInstruments[n.track],
     });
   }
   for (const d of song.drums) {

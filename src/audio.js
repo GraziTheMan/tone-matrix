@@ -81,7 +81,7 @@ export class AudioEngine {
       const external = this.midiOut?.active;
       for (const n of this.getNotesForStep(step)) {
         if (external) {
-          this.midiOut.note(0, n.midi, n.midiVelocity, when, n.durSteps * stepDur, this.ctx);
+          this.midiOut.note(n.channel ?? 0, n.midi, n.midiVelocity, when, n.durSteps * stepDur, this.ctx);
         } else {
           playNote(this.chain, { ...n, when, stepDur });
         }
@@ -104,14 +104,14 @@ export class AudioEngine {
   }
 
   // Immediate one-shot preview when the user paints a cell.
-  preview({ midi, velocity, midiVelocity, durSteps = 1 }) {
+  preview({ midi, velocity, midiVelocity, durSteps = 1, instrument, channel = 0 }) {
     this.ensureContext();
     if (this.ctx.state === "suspended") this.ctx.resume();
     const stepDur = this.secondsPerStep();
     if (this.midiOut?.active) {
-      this.midiOut.note(0, midi, midiVelocity, this.ctx.currentTime, durSteps * stepDur, this.ctx);
+      this.midiOut.note(channel, midi, midiVelocity, this.ctx.currentTime, durSteps * stepDur, this.ctx);
     } else {
-      playNote(this.chain, { midi, velocity, durSteps, when: this.ctx.currentTime, stepDur });
+      playNote(this.chain, { midi, velocity, durSteps, instrument, when: this.ctx.currentTime, stepDur });
     }
   }
 

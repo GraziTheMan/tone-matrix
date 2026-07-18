@@ -32,13 +32,23 @@ function createNoiseBuffer(ctx) {
   return buffer;
 }
 
-// A bell-ish voice: sine fundamental + quiet octave partial, sharp attack.
-// Single steps get the classic exponential-decay pluck; tied notes sustain
-// for their full length before releasing.
-export function playNote(chain, { midi, when, velocity = 0.7, durSteps = 1, stepDur }) {
+// Melody instruments. "bell" is the classic ToneMatrix voice (sine + quiet
+// octave partial); the raw waveforms get a lowpass and a gain trim so they
+// sit at a comparable loudness.
+export const INSTRUMENTS = {
+  bell: { label: "Bell", type: "sine", gain: 1.0, partial: 0.18 },
+  square: { label: "Square", type: "square", gain: 0.4, filterMult: 6 },
+  triangle: { label: "Triangle", type: "triangle", gain: 0.9 },
+  sawtooth: { label: "Saw", type: "sawtooth", gain: 0.45, filterMult: 5 },
+};
+
+// Sharp attack; single steps get the classic exponential-decay pluck, tied
+// notes sustain for their full length before releasing.
+export function playNote(chain, { midi, when, velocity = 0.7, durSteps = 1, stepDur, instrument = "bell" }) {
   const { ctx } = chain;
+  const voice = INSTRUMENTS[instrument] ?? INSTRUMENTS.bell;
   const freq = midiToFreq(midi);
-  const peak = 0.32 * velocity;
+  const peak = 0.32 * velocity * voice.gain;
   const release = 0.35;
   let end;
 
@@ -56,25 +66,39 @@ export function playNote(chain, { midi, when, velocity = 0.7, durSteps = 1, step
   }
 
   const osc = ctx.createOscillator();
-  osc.type = "sine";
+  osc.type = voice.type;
   osc.frequency.value = freq;
 
-  const partial = ctx.createOscillator();
-  partial.type = "sine";
-  partial.frequency.value = freq * 2;
-  const partialGain = ctx.createGain();
-  partialGain.gain.value = 0.18;
+  let head = env; // node the oscillators feed into
+  if (voice.filterMult) {
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = Math.min(freq * voice.filterMult, 12000);
+    filter.connect(env);
+    head = filter;
+  }
+  osc.connect(head);
 
-  osc.connect(env);
-  partial.connect(partialGain);
-  partialGain.connect(env);
+  let partial = null;
+  if (voice.partial) {
+    partial = ctx.createOscillator();
+    partial.type = "sine";
+    partial.frequency.value = freq * 2;
+    const partialGain = ctx.createGain();
+    partialGain.gain.value = voice.partial;
+    partial.connect(partialGain);
+    partialGain.connect(head);
+  }
+
   env.connect(chain.master);
   env.connect(chain.delay);
 
   osc.start(when);
-  partial.start(when);
   osc.stop(end + 0.05);
-  partial.stop(end + 0.05);
+  if (partial) {
+    partial.start(when);
+    partial.stop(end + 0.05);
+  }
 }
 
 function noiseSource(chain, when, dur, { type, freq, gain }) {

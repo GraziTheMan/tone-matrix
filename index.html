@@ -55,6 +55,15 @@
         <div id="song-chain" class="song-chain" aria-label="Song chain"></div>
         <button id="song-add" class="btn btn-small" title="Append the selected pattern to the song">+</button>
       </div>
+      <div class="track-bar">
+        <div id="track-tabs" class="track-tabs" role="group" aria-label="Melody tracks"></div>
+        <select id="instrument" title="Instrument for this track"></select>
+        <div class="octave-ctl" title="Octave shift for this track">
+          <button id="oct-down" class="btn btn-small" aria-label="Octave down">&minus;</button>
+          <span id="oct-label">Oct 0</span>
+          <button id="oct-up" class="btn btn-small" aria-label="Octave up">+</button>
+        </div>
+      </div>
       <div id="pages" class="pages" hidden>
         <div id="page-tabs" class="page-tabs"></div>
         <button id="follow" class="btn btn-small active" aria-pressed="true" title="Follow the playhead across pages">

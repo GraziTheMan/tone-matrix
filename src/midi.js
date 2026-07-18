@@ -55,26 +55,34 @@ function trackChunk(events, totalTicks, prefix = []) {
   ];
 }
 
-// segments: [{ grid, tieGrid, drumGrid, steps }] played back to back.
+// GM program per instrument, so DAWs pick a comparable sound.
+const GM_PROGRAM = { bell: 10, square: 80, triangle: 72, sawtooth: 81 };
+
+// segments: [{ tracks: [{ grid, tieGrid }], drumGrid, steps }] back to back.
+// trackNotes: per melody track, the MIDI note for each row (octave applied).
+// trackInstruments: per melody track, an instrument id for the GM program.
 export function songToMidi({
   segments,
-  rowNotes,
+  trackNotes,
+  trackInstruments,
   drumNotes,
   bpm,
   swing = 0.5, // ratio 0.5 (straight) … 0.75
   melodyAudible,
   drumAudible,
+  trackAudible,
 }) {
-  const song = collectSong(segments, { melodyAudible, drumAudible });
+  const song = collectSong(segments, { melodyAudible, drumAudible, trackAudible });
   const swingTicks = Math.round((swing - 0.5) * 2 * TICKS_PER_STEP);
   const tickOf = (s) => s * TICKS_PER_STEP + (s % 2 ? swingTicks : 0);
 
-  const melody = [];
+  const melodyByTrack = trackNotes.map(() => []);
   for (const n of song.melody) {
-    const note = rowNotes[n.row];
+    const note = trackNotes[n.track][n.row];
     const velocity = MIDI_VELOCITY[n.value] ?? MIDI_VELOCITY[1];
-    melody.push({ tick: tickOf(n.step), off: false, note, velocity, channel: 0 });
-    melody.push({ tick: tickOf(n.step + n.durSteps), off: true, note, velocity: 0, channel: 0 });
+    const channel = n.track;
+    melodyByTrack[n.track].push({ tick: tickOf(n.step), off: false, note, velocity, channel });
+    melodyByTrack[n.track].push({ tick: tickOf(n.step + n.durSteps), off: true, note, velocity: 0, channel });
   }
   const drums = [];
   for (const d of song.drums) {
@@ -83,27 +91,31 @@ export function songToMidi({
     drums.push({ tick: tickOf(d.step), off: false, note, velocity, channel: 9 });
     drums.push({ tick: tickOf(d.step + 1), off: true, note, velocity: 0, channel: 9 });
   }
-  sortEvents(melody);
-  sortEvents(drums);
   const totalTicks = song.totalSteps * TICKS_PER_STEP;
 
   // Tempo meta event: microseconds per quarter note.
   const usPerQuarter = Math.round(60_000_000 / bpm);
-  const melodyPrefix = [
+  const tempoPrefix = [
     0x00, 0xff, 0x51, 0x03,
     (usPerQuarter >> 16) & 0xff, (usPerQuarter >> 8) & 0xff, usPerQuarter & 0xff,
-    // Program change: music box (GM patch 11) suits the bell timbre.
-    0x00, 0xc0, 10,
   ];
 
-  const melodyTrack = trackChunk(melody, totalTicks, melodyPrefix);
-  const drumTrack = trackChunk(drums, totalTicks);
+  const chunks = [];
+  for (let t = 0; t < trackNotes.length; t++) {
+    const prefix = [
+      ...(t === 0 ? tempoPrefix : []),
+      0x00, 0xc0 | t, GM_PROGRAM[trackInstruments[t]] ?? 10,
+    ];
+    chunks.push(trackChunk(sortEvents(melodyByTrack[t]), totalTicks, prefix));
+  }
+  chunks.push(trackChunk(sortEvents(drums), totalTicks));
 
+  const ntrks = chunks.length;
   return new Uint8Array([
-    // MThd: format 1, two tracks, PPQ division.
-    0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 2, (PPQ >> 8) & 0xff, PPQ & 0xff,
-    ...melodyTrack,
-    ...drumTrack,
+    // MThd: format 1, PPQ division.
+    0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, (ntrks >> 8) & 0xff, ntrks & 0xff,
+    (PPQ >> 8) & 0xff, PPQ & 0xff,
+    ...chunks.flat(),
   ]);
 }
 

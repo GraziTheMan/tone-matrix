@@ -7,6 +7,11 @@ never got: **MIDI export**.
 - 16-row melody grid: rows are pitches on the selected scale, columns are
   16th-note steps. Patterns can be 16, 32, or 64 steps, paged 16 columns at a
   time with a follow-the-playhead mode.
+- **Three melody tracks** play simultaneously, color-coded (cyan, green,
+  pink) with ghost dots showing the other tracks' notes while you edit.
+  Each track has its own **instrument** (bell, square, triangle, saw) and
+  its own **octave shift** (±2), and exports as its own MIDI track/channel
+  with a matching GM program. Tap a track tab to select it, hold to mute.
 - 4×16 percussion grid underneath: open hat, closed hat, snare, kick — all
   synthesized in Web Audio (no samples).
 - Seven scales: Major/Minor Pentatonic, Blues, Dorian, Harmonic Minor,
