@@ -16,6 +16,9 @@ export const SCALES = [
   { label: "Harmonic Minor", intervals: [0, 2, 3, 5, 7, 8, 11] },
   { label: "Hungarian Minor", intervals: [0, 2, 3, 6, 7, 8, 11] },
   { label: "Phrygian Dominant", intervals: [0, 1, 4, 5, 7, 8, 10] },
+  // Appended after release — keep order so saved scaleIndex values stay valid.
+  { label: "Melodic Minor", intervals: [0, 2, 3, 5, 7, 9, 11] },
+  { label: "Diminished (W-H)", intervals: [0, 2, 3, 5, 6, 8, 9, 11] },
 ];
 
 export const ROOT_CHOICES = [
