@@ -78,6 +78,7 @@ export function songToMidi({
   drumNotes,
   bpm,
   swing = 0.5, // ratio 0.5 (straight) … 0.75
+  accentVelocity = MIDI_VELOCITY[2],
   melodyAudible,
   drumAudible,
   trackAudible,
@@ -85,11 +86,12 @@ export function songToMidi({
   const song = collectSong(segments, { melodyAudible, drumAudible, trackAudible });
   const swingTicks = Math.round((swing - 0.5) * 2 * TICKS_PER_STEP);
   const tickOf = (s) => s * TICKS_PER_STEP + (s % 2 ? swingTicks : 0);
+  const velocityOf = (v) => (v === 2 ? accentVelocity : MIDI_VELOCITY[1]);
 
   const melodyByTrack = trackNotes.map(() => []);
   for (const n of song.melody) {
     const note = trackNotes[n.track][n.row];
-    const velocity = MIDI_VELOCITY[n.value] ?? MIDI_VELOCITY[1];
+    const velocity = velocityOf(n.value);
     const channel = n.track;
     melodyByTrack[n.track].push({ tick: tickOf(n.step), off: false, note, velocity, channel });
     melodyByTrack[n.track].push({ tick: tickOf(n.step + n.durSteps), off: true, note, velocity: 0, channel });
@@ -97,7 +99,7 @@ export function songToMidi({
   const drums = [];
   for (const d of song.drums) {
     const note = drumNotes[d.row];
-    const velocity = MIDI_VELOCITY[d.value] ?? MIDI_VELOCITY[1];
+    const velocity = velocityOf(d.value);
     drums.push({ tick: tickOf(d.step), off: false, note, velocity, channel: 9 });
     drums.push({ tick: tickOf(d.step + 1), off: true, note, velocity: 0, channel: 9 });
   }

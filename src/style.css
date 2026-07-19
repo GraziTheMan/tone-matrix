@@ -1,5 +1,11 @@
 :root {
   --bg: #0b0f14;
+  --grad-top: #141d29;
+  --border: #223044;
+  --border-strong: #33465f;
+  --mute-dash: #38424f;
+  --btn-on-text: #06262b;
+  --btn-on-hover: #6fdbe9;
   --panel: #121821;
   --cell: #1b2431;
   --cell-hover: #263243;
@@ -24,7 +30,7 @@ html {
 
 body {
   min-height: 100%;
-  background: radial-gradient(1200px 800px at 50% -10%, #141d29, var(--bg));
+  background: radial-gradient(1200px 800px at 50% -10%, var(--grad-top), var(--bg));
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   display: flex;
@@ -70,7 +76,7 @@ body {
 .btn {
   background: var(--panel);
   color: var(--text);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 14px;
   font-size: 0.9rem;
@@ -85,13 +91,13 @@ body {
 .btn-primary {
   background: var(--on);
   border-color: var(--on);
-  color: #06262b;
+  color: var(--btn-on-text);
   font-weight: 600;
   min-width: 68px;
 }
 
 .btn-primary:hover {
-  background: #6fdbe9;
+  background: var(--btn-on-hover);
 }
 
 .btn-accent {
@@ -138,12 +144,12 @@ body {
 .btn.active {
   background: var(--on);
   border-color: var(--on);
-  color: #06262b;
+  color: var(--btn-on-text);
   font-weight: 600;
 }
 
 .btn.active:hover {
-  background: #6fdbe9;
+  background: var(--btn-on-hover);
 }
 
 .pattern-bar,
@@ -164,7 +170,7 @@ body {
 .slot {
   background: var(--panel);
   color: var(--muted);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 8px;
   min-width: 36px;
   padding: 6px 0;
@@ -175,7 +181,7 @@ body {
 
 .slot.filled {
   color: var(--text);
-  border-color: #33465f;
+  border-color: var(--border-strong);
 }
 
 .slot.active {
@@ -207,7 +213,7 @@ body {
 .chip {
   background: var(--cell);
   color: var(--text);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 7px;
   min-width: 30px;
   padding: 5px 0;
@@ -223,7 +229,7 @@ body {
 .chip.playing {
   background: var(--on);
   border-color: var(--on);
-  color: #06262b;
+  color: var(--btn-on-text);
   font-weight: 600;
 }
 
@@ -248,7 +254,7 @@ body {
 .track-tab {
   background: var(--panel);
   color: var(--muted);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-bottom-width: 3px;
   border-radius: 8px;
   min-width: 40px;
@@ -292,7 +298,7 @@ body {
 #instrument {
   background: var(--panel);
   color: var(--text);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 7px 10px;
   font-size: 0.85rem;
@@ -320,7 +326,7 @@ body {
 .tab {
   background: var(--panel);
   color: var(--muted);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 8px;
   min-width: 40px;
   padding: 6px 0;
@@ -350,7 +356,7 @@ body {
 #root {
   background: var(--panel);
   color: var(--text);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 0.9rem;
@@ -396,7 +402,7 @@ body {
 }
 
 .row-head.muted::after {
-  background: #38424f;
+  background: var(--mute-dash);
   box-shadow: none;
   width: 10px;
   height: 2px;
@@ -564,7 +570,7 @@ body {
 #scale {
   background: var(--panel);
   color: var(--text);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 0.9rem;
@@ -573,7 +579,7 @@ body {
 .settings {
   margin-top: 16px;
   background: var(--panel);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 0.9rem;
@@ -616,7 +622,7 @@ body {
 #midi-out {
   background: var(--cell);
   color: var(--text);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 0.85rem;
@@ -646,7 +652,7 @@ body {
   width: 70px;
   background: var(--cell);
   color: var(--text);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 8px;
   font-size: 0.9rem;
@@ -662,6 +668,48 @@ body {
   font-size: 0.8rem;
 }
 
+.clear-wrap {
+  position: relative;
+}
+
+.clear-menu[hidden] {
+  display: none;
+}
+
+.clear-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.clear-item {
+  background: none;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  padding: 9px 12px;
+  font-size: 0.88rem;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.clear-item:hover {
+  background: var(--cell-hover);
+}
+
+.setting-slider {
+  margin-top: 10px;
+}
+
 .project-save {
   display: flex;
   flex-wrap: wrap;
@@ -674,7 +722,7 @@ body {
   min-width: 140px;
   background: var(--cell);
   color: var(--text);
-  border: 1px solid #223044;
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 0.9rem;
@@ -699,4 +747,51 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+
+/* ---- Light theme (follows system setting) -------------------------------- */
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #e8edf3;
+    --grad-top: #f7fafc;
+    --panel: #ffffff;
+    --cell: #cdd7e3;
+    --cell-hover: #b9c7d8;
+    --on: #0097a7;
+    --on-glow: rgba(0, 151, 167, 0.4);
+    --playhead: rgba(15, 35, 60, 0.1);
+    --text: #1d2733;
+    --muted: #5c6b7c;
+    --accent: #e08600;
+    --accent-glow: rgba(224, 134, 0, 0.35);
+    --border: #b7c4d4;
+    --border-strong: #93a5bb;
+    --mute-dash: #9aa8b8;
+    --btn-on-text: #ffffff;
+    --btn-on-hover: #00acc1;
+  }
+
+  .grid.track-1 {
+    --tc: #689f38;
+    --tc-glow: rgba(104, 159, 56, 0.4);
+  }
+
+  .grid.track-2 {
+    --tc: #d81b60;
+    --tc-glow: rgba(216, 27, 96, 0.4);
+  }
+
+  .cell.ghost-1::before {
+    background: #689f38;
+  }
+
+  .cell.ghost-2::before {
+    background: #d81b60;
+  }
+
+  .clear-menu {
+    box-shadow: 0 8px 24px rgba(30, 45, 65, 0.25);
+  }
 }

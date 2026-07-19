@@ -11,7 +11,7 @@ import {
 import { DRUMS, DRUM_ROWS, defaultDrumMap } from "./drums.js";
 import { AudioEngine } from "./audio.js";
 import { INSTRUMENTS } from "./synth.js";
-import { songToMidi, MIDI_VELOCITY } from "./midi.js";
+import { songToMidi } from "./midi.js";
 import { downloadFile } from "./download.js";
 import { renderSongToWav } from "./render.js";
 import { MidiOut } from "./midiout.js";
@@ -24,8 +24,12 @@ const PATTERN_NAMES = "ABCDEFGHIJKL";
 const TRACK_COUNT = 3;
 const OCTAVE_RANGE = 2; // per-track shift of ±2 octaves
 
-// Cell values: 0 = off, 1 = on, 2 = accented. Audio velocities per value:
-const VEL = { 1: 0.7, 2: 1.0 };
+// Cell values: 0 = off, 1 = on, 2 = accented. Accent loudness is a user
+// setting (percent extra on top of the normal velocity).
+let accentBoost = 60;
+const velFor = (value) => (value === 2 ? 0.7 * (1 + accentBoost / 100) : 0.7);
+const midiVelFor = (value) =>
+  value === 2 ? Math.min(127, Math.round(88 * (1 + accentBoost / 100))) : 88;
 
 // ---- State ----------------------------------------------------------------
 
@@ -137,6 +141,7 @@ function buildStateObject() {
     })),
     trackSettings,
     drumsMuted,
+    accentBoost,
     selectedPattern,
     songChain,
     songMode,
@@ -226,6 +231,9 @@ function applyStateData(data) {
         trackSettings = defaultTrackSettings();
       }
       drumsMuted = data.drumsMuted === true;
+      if (Number.isInteger(data.accentBoost) && data.accentBoost >= 10 && data.accentBoost <= 100) {
+        accentBoost = data.accentBoost;
+      }
     } else if (data.cells) {
       // Older single-pattern format: migrate into slot A.
       patterns[0] = loadPattern({
@@ -322,8 +330,8 @@ engine.getNotesForStep = (step) => {
         const value = grid[row][step];
         notes.push({
           midi: trackNote(t, row),
-          velocity: VEL[value],
-          midiVelocity: MIDI_VELOCITY[value],
+          velocity: velFor(value),
+          midiVelocity: midiVelFor(value),
           durSteps: noteLength(pat, t, row, step),
           instrument: trackSettings[t].instrument,
           channel: t,
@@ -343,8 +351,8 @@ engine.getDrumsForStep = (step) => {
       hits.push({
         id: DRUMS[row].id,
         note: drumMap[row],
-        velocity: VEL[value],
-        midiVelocity: MIDI_VELOCITY[value],
+        velocity: velFor(value),
+        midiVelocity: midiVelFor(value),
       });
     }
   }
@@ -494,15 +502,15 @@ function previewCell(kind, row, step) {
     engine.previewDrum({
       id: DRUMS[row].id,
       note: drumMap[row],
-      velocity: VEL[value],
-      midiVelocity: MIDI_VELOCITY[value],
+      velocity: velFor(value),
+      midiVelocity: midiVelFor(value),
     });
   } else {
     const value = pat.tracks[activeTrack].grid[row][step];
     engine.preview({
       midi: trackNote(activeTrack, row),
-      velocity: VEL[value],
-      midiVelocity: MIDI_VELOCITY[value],
+      velocity: velFor(value),
+      midiVelocity: midiVelFor(value),
       durSteps: noteLength(pat, activeTrack, row, step),
       instrument: trackSettings[activeTrack].instrument,
       channel: activeTrack,
@@ -872,8 +880,8 @@ instrumentSelect.addEventListener("change", () => {
   trackSettings[activeTrack].instrument = instrumentSelect.value;
   engine.preview({
     midi: trackNote(activeTrack, ROWS - 4),
-    velocity: VEL[1],
-    midiVelocity: MIDI_VELOCITY[1],
+    velocity: velFor(1),
+    midiVelocity: midiVelFor(1),
     instrument: instrumentSelect.value,
     channel: activeTrack,
   });
@@ -889,8 +897,8 @@ function shiftOctave(delta) {
   refreshMelodyTooltips();
   engine.preview({
     midi: trackNote(activeTrack, ROWS - 4),
-    velocity: VEL[1],
-    midiVelocity: MIDI_VELOCITY[1],
+    velocity: velFor(1),
+    midiVelocity: midiVelFor(1),
     instrument: s.instrument,
     channel: activeTrack,
   });
@@ -960,6 +968,14 @@ const lengthSelect = document.getElementById("length");
 const toolDrawBtn = document.getElementById("tool-draw");
 const toolTieBtn = document.getElementById("tool-tie");
 const remapToggle = document.getElementById("remap-toggle");
+const accentInput = document.getElementById("accent");
+const accentLabel = document.getElementById("accent-label");
+
+accentInput.addEventListener("input", () => {
+  accentBoost = +accentInput.value;
+  accentLabel.textContent = `Accent +${accentBoost}%`;
+  saveState();
+});
 
 for (const [i, root] of ROOT_CHOICES.entries()) {
   const opt = document.createElement("option");
@@ -1105,21 +1121,115 @@ function setTool(next) {
 toolDrawBtn.addEventListener("click", () => setTool("draw"));
 toolTieBtn.addEventListener("click", () => setTool("tie"));
 
-document.getElementById("clear").addEventListener("click", () => {
-  const pat = current();
-  if (
-    !patternIsEmpty(pat) &&
-    !confirm(
-      `Clear pattern ${PATTERN_NAMES[selectedPattern]}? All its notes, ties, and drums will be removed.`
-    )
-  ) {
-    return;
-  }
-  pat.tracks = Array.from({ length: TRACK_COUNT }, emptyTrack);
-  pat.drumGrid = emptyGrid(DRUM_ROWS);
+// ---- Clear menu ------------------------------------------------------------
+
+const clearBtn = document.getElementById("clear");
+const clearMenu = document.getElementById("clear-menu");
+
+function resetProjectState() {
+  patterns = Array.from({ length: PATTERN_COUNT }, emptyPattern);
+  selectedPattern = 0;
+  songChain = [];
+  songMode = false;
+  bpm = 120;
+  swing = 50;
+  rootIndex = 0;
+  scaleIndex = 0;
+  trackSettings = defaultTrackSettings();
+  drumsMuted = false;
+  mute = { melody: Array(ROWS).fill(false), drum: Array(DRUM_ROWS).fill(false) };
+  solo = { melody: Array(ROWS).fill(false), drum: Array(DRUM_ROWS).fill(false) };
+  rowNotes = currentScaleNotes();
+}
+
+function afterClear() {
   renderView();
   renderPatternSlots();
+  renderSongChain();
   saveState();
+}
+
+const CLEAR_OPTIONS = [
+  {
+    label: () => `Track ${activeTrack + 1} on pattern ${PATTERN_NAMES[selectedPattern]}`,
+    confirmText: () =>
+      `Clear track ${activeTrack + 1} on pattern ${PATTERN_NAMES[selectedPattern]}?`,
+    run: () => {
+      current().tracks[activeTrack] = emptyTrack();
+      afterClear();
+    },
+  },
+  {
+    label: () => `Drums on pattern ${PATTERN_NAMES[selectedPattern]}`,
+    confirmText: () => `Clear the drums on pattern ${PATTERN_NAMES[selectedPattern]}?`,
+    run: () => {
+      current().drumGrid = emptyGrid(DRUM_ROWS);
+      afterClear();
+    },
+  },
+  {
+    label: () => `Whole pattern ${PATTERN_NAMES[selectedPattern]}`,
+    confirmText: () =>
+      `Clear pattern ${PATTERN_NAMES[selectedPattern]}? All its tracks, ties, and drums will be removed.`,
+    run: () => {
+      const pat = current();
+      pat.tracks = Array.from({ length: TRACK_COUNT }, emptyTrack);
+      pat.drumGrid = emptyGrid(DRUM_ROWS);
+      afterClear();
+    },
+  },
+  {
+    label: () => "Song chain",
+    confirmText: () => "Clear the song chain? The patterns themselves are kept.",
+    run: () => {
+      songChain = [];
+      afterClear();
+    },
+  },
+  {
+    label: () => "Entire project",
+    confirmText: () =>
+      "Clear the ENTIRE project — all patterns, the song chain, and settings? Saved projects are kept.",
+    run: () => {
+      stopPlayback();
+      resetProjectState();
+      saveState();
+      syncUI();
+    },
+  },
+];
+
+function hideClearMenu() {
+  clearMenu.hidden = true;
+  clearBtn.setAttribute("aria-expanded", "false");
+}
+
+clearBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (!clearMenu.hidden) {
+    hideClearMenu();
+    return;
+  }
+  clearMenu.replaceChildren();
+  for (const opt of CLEAR_OPTIONS) {
+    const item = document.createElement("button");
+    item.className = "clear-item";
+    item.textContent = opt.label();
+    item.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      hideClearMenu();
+      if (confirm(opt.confirmText())) opt.run();
+    });
+    clearMenu.appendChild(item);
+  }
+  clearMenu.hidden = false;
+  clearBtn.setAttribute("aria-expanded", "true");
+});
+
+window.addEventListener("pointerdown", (e) => {
+  if (!clearMenu.hidden && !clearMenu.contains(e.target) && e.target !== clearBtn) {
+    hideClearMenu();
+  }
 });
 
 function exportArgs() {
@@ -1136,6 +1246,8 @@ function exportArgs() {
     trackAudible: trackSettings.map((t) => !t.muted),
     bpm,
     swing: swing / 100,
+    accentVelocity: midiVelFor(2),
+    accentAudio: velFor(2),
     melodyAudible: Array.from({ length: ROWS }, (_, r) => rowAudible("melody", r)),
     drumAudible: Array.from({ length: DRUM_ROWS }, (_, r) => !drumsMuted && rowAudible("drum", r)),
   };
@@ -1190,7 +1302,7 @@ for (let row = 0; row < ROWS; row++) {
       rowNotes = [...customScale];
       refreshMelodyTooltips();
     }
-    engine.preview({ midi: value, velocity: VEL[1], midiVelocity: MIDI_VELOCITY[1] });
+    engine.preview({ midi: value, velocity: velFor(1), midiVelocity: midiVelFor(1) });
     saveState();
   });
 
@@ -1298,6 +1410,21 @@ function renderProjectList() {
     projectListEl.appendChild(row);
   }
 }
+
+document.getElementById("project-new").addEventListener("click", () => {
+  const hasContent = patterns.some((p) => !patternIsEmpty(p)) || songChain.length;
+  if (
+    hasContent &&
+    !confirm("Start a new project? Unsaved changes to the current one will be lost.")
+  ) {
+    return;
+  }
+  stopPlayback();
+  resetProjectState();
+  projectNameInput.value = "";
+  saveState();
+  syncUI();
+});
 
 document.getElementById("project-save").addEventListener("click", () => {
   const name =
@@ -1455,6 +1582,8 @@ function syncUI() {
   scaleSelect.value = scaleIndex;
   lengthSelect.value = current().length;
   remapToggle.checked = remapOnScaleChange;
+  accentInput.value = accentBoost;
+  accentLabel.textContent = `Accent +${accentBoost}%`;
   songModeBtn.classList.toggle("active", songMode);
   songModeBtn.setAttribute("aria-pressed", String(songMode));
   renderTrackBar();

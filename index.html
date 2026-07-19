@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#0b0f14" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0f14" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#e8edf3" />
     <title>Tone Matrix</title>
     <link
       rel="icon"
@@ -40,7 +41,10 @@
             <button id="tool-draw" class="btn active" aria-pressed="true">Draw</button>
             <button id="tool-tie" class="btn" aria-pressed="false">Tie</button>
           </div>
-          <button id="clear" class="btn">Clear</button>
+          <div class="clear-wrap">
+            <button id="clear" class="btn" aria-haspopup="true" aria-expanded="false">Clear&hellip;</button>
+            <div id="clear-menu" class="clear-menu" hidden></div>
+          </div>
         </div>
       </header>
       <div class="pattern-bar">
@@ -75,6 +79,7 @@
       <details class="settings">
         <summary>Projects</summary>
         <div class="project-save">
+          <button id="project-new" class="btn btn-small">New</button>
           <input id="project-name" type="text" placeholder="Project name" maxlength="40" />
           <button id="project-save" class="btn btn-small">Save</button>
           <button id="project-import" class="btn btn-small">Import file</button>
@@ -84,6 +89,14 @@
       </details>
       <details class="settings">
         <summary>Settings</summary>
+        <label class="slider setting-slider">
+          <span id="accent-label">Accent +60%</span>
+          <input id="accent" type="range" min="10" max="100" step="5" value="60" />
+        </label>
+        <p class="settings-note">
+          How much louder accented (press-and-hold) notes play, in the synth
+          and in exports.
+        </p>
         <label class="setting-row">
           <input type="checkbox" id="remap-toggle" />
           <span>

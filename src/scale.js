@@ -19,6 +19,12 @@ export const SCALES = [
   // Appended after release — keep order so saved scaleIndex values stay valid.
   { label: "Melodic Minor", intervals: [0, 2, 3, 5, 7, 9, 11] },
   { label: "Diminished (W-H)", intervals: [0, 2, 3, 5, 6, 8, 9, 11] },
+  { label: "Major (Ionian)", intervals: [0, 2, 4, 5, 7, 9, 11] },
+  { label: "Natural Minor (Aeolian)", intervals: [0, 2, 3, 5, 7, 8, 10] },
+  { label: "Phrygian", intervals: [0, 1, 3, 5, 7, 8, 10] },
+  { label: "Lydian", intervals: [0, 2, 4, 6, 7, 9, 11] },
+  { label: "Mixolydian", intervals: [0, 2, 4, 5, 7, 9, 10] },
+  { label: "Locrian", intervals: [0, 1, 3, 5, 6, 8, 10] },
 ];
 
 export const ROOT_CHOICES = [
