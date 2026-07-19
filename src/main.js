@@ -1254,7 +1254,7 @@ function exportArgs() {
 }
 
 document.getElementById("export").addEventListener("click", () => {
-  downloadFile(songToMidi({ ...exportArgs(), drumNotes: drumMap }), "tone-matrix.mid", "audio/midi");
+  downloadFile(songToMidi({ ...exportArgs(), drumNotes: drumMap }), "sonic-squares.mid", "audio/midi");
 });
 
 const exportWavBtn = document.getElementById("export-wav");
@@ -1263,7 +1263,7 @@ exportWavBtn.addEventListener("click", async () => {
   exportWavBtn.textContent = "Rendering…";
   try {
     const bytes = await renderSongToWav(exportArgs());
-    await downloadFile(bytes, "tone-matrix.wav", "audio/wav");
+    await downloadFile(bytes, "sonic-squares.wav", "audio/wav");
   } finally {
     exportWavBtn.disabled = false;
     exportWavBtn.textContent = "Export WAV";
@@ -1394,7 +1394,7 @@ function renderProjectList() {
     exportBtn.addEventListener("click", () => {
       const bytes = new TextEncoder().encode(JSON.stringify(projects[name], null, 2));
       const safe = name.replace(/[^\w\- ]+/g, "").trim() || "project";
-      downloadFile(bytes, `${safe}.tonematrix.json`, "application/json");
+      downloadFile(bytes, `${safe}.sonicsquares.json`, "application/json");
     });
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "btn btn-small";
@@ -1459,10 +1459,10 @@ projectFileInput.addEventListener("change", async () => {
       if (!Array.isArray(data.patterns) && !data.cells) throw new Error("not a project");
     }
     loadProjectState(data);
-    const name = file.name.replace(/\.tonematrix\.json$|\.json$|\.tmx$/i, "");
+    const name = file.name.replace(/\.sonicsquares\.json$|\.tonematrix\.json$|\.json$|\.tmx$/i, "");
     projectNameInput.value = name;
   } catch {
-    alert("That file doesn't look like a Tone Matrix project or RollingTones song.");
+    alert("That file doesn't look like a Sonic Squares project or RollingTones song.");
   }
 });
 

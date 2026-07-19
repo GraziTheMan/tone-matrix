@@ -1,4 +1,4 @@
-# Tone Matrix
+# Sonic Squares
 
 A small, dependency-free music toy inspired by **Rolling Tones** / the classic
 ToneMatrix and Tenori-on grid sequencers — with the one feature the original
@@ -20,7 +20,7 @@ never got: **MIDI export**.
   rows. It starts as a copy of the current scale so you can tweak from
   there.
 - **Projects**: save named projects in-app for instant load, and
-  export/import them as `.tonematrix.json` files — on Android the share
+  export/import them as `.sonicsquares.json` files — on Android the share
   sheet lets you save them to any folder (Files, Drive, …) or send them to
   a friend, who can Import them back. Projects carry everything: patterns,
   song chain, scale (custom included), drum mapping, tempo, swing.
@@ -53,7 +53,7 @@ never got: **MIDI export**.
   no dropouts, includes the delay tail.
 - **Export MIDI** writes a Standard MIDI File (format 1) by hand: melody on
   channel 1, drums on channel 10, with a tempo meta event so the file opens
-  at your BPM in any DAW. Downloads as `tone-matrix.mid`.
+  at your BPM in any DAW. Downloads as `sonic-squares.mid`.
 - **Remappable drum notes**: exported percussion defaults to General MIDI
   (kick 36, snare 38, hats 42/46) but each lane's note number can be changed
   in the "Percussion MIDI mapping" panel for instruments with nonstandard
@@ -73,7 +73,7 @@ The `dist/` output is plain static files and works fully offline.
 ## Packaging for Android
 
 The repo ships with a ready-made [Capacitor](https://capacitorjs.com/)
-Android project in `android/` (app id `com.grazitheman.tonematrix`). To
+Android project in `android/` (app id `com.grazitheman.sonicsquares`). To
 build an installable APK you need the Android SDK — either Android Studio
 or command-line tools:
 

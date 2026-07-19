@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Tone Matrix</string>
-    <string name="title_activity_main">Tone Matrix</string>
-    <string name="package_name">com.grazitheman.tonematrix</string>
-    <string name="custom_url_scheme">com.grazitheman.tonematrix</string>
+    <string name="app_name">Sonic Squares</string>
+    <string name="title_activity_main">Sonic Squares</string>
+    <string name="package_name">com.grazitheman.sonicsquares</string>
+    <string name="custom_url_scheme">com.grazitheman.sonicsquares</string>
 </resources>

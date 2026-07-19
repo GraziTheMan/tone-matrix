@@ -1,6 +1,6 @@
 {
-  "appId": "com.grazitheman.tonematrix",
-  "appName": "Tone Matrix",
+  "appId": "com.grazitheman.sonicsquares",
+  "appName": "Sonic Squares",
   "webDir": "dist",
   "android": {
     "backgroundColor": "#0b0f14"

@@ -47,12 +47,12 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: tone-matrix-apk
+          name: sonic-squares-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
         with:
-          name: tone-matrix-playstore-aab
+          name: sonic-squares-playstore-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error

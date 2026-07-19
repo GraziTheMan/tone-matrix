@@ -1,10 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.grazitheman.tonematrix"
+    namespace = "com.grazitheman.sonicsquares"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.grazitheman.tonematrix"
+        applicationId "com.grazitheman.sonicsquares"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // CI sets these from the workflow run number so every Play upload has

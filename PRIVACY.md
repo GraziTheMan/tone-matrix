@@ -1,13 +1,13 @@
-# Tone Matrix — Privacy Policy
+# Sonic Squares — Privacy Policy
 
 _Last updated: 18 July 2026_
 
-Tone Matrix is a music sequencer app. It is designed to work entirely on
+Sonic Squares is a music sequencer app. It is designed to work entirely on
 your device.
 
 ## Data collection
 
-Tone Matrix does **not** collect, store, transmit, sell, or share any
+Sonic Squares does **not** collect, store, transmit, sell, or share any
 personal data. There are no accounts, no analytics, no advertising, and no
 network communication of any kind initiated by the app.
 
@@ -33,7 +33,7 @@ own permission prompt.
 ## Contact
 
 Questions about this policy: open an issue at
-https://github.com/GraziTheMan/tone-matrix or contact the developer,
+https://github.com/GraziTheMan/sonic-squares or contact the developer,
 GraziTheMan, via GitHub.
 
 ## Changes

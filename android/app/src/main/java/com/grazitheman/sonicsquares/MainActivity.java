@@ -1,4 +1,4 @@
-package com.grazitheman.tonematrix;
+package com.grazitheman.sonicsquares;
 
 import com.getcapacitor.BridgeActivity;
 
