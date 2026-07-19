@@ -216,9 +216,7 @@ function applyStateData(data) {
       if (typeof data.midiOutId === "string") midiOutId = data.midiOutId;
       if (Array.isArray(data.trackSettings) && data.trackSettings.length === TRACK_COUNT) {
         trackSettings = data.trackSettings.map((t) => ({
-          instrument: ["bell", "square", "triangle", "sawtooth"].includes(t?.instrument)
-            ? t.instrument
-            : "bell",
+          instrument: Object.keys(INSTRUMENTS).includes(t?.instrument) ? t.instrument : "bell",
           octave:
             Number.isInteger(t?.octave) && Math.abs(t.octave) <= OCTAVE_RANGE ? t.octave : 0,
           muted: t?.muted === true,

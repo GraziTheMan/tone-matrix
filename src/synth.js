@@ -32,42 +32,83 @@ function createNoiseBuffer(ctx) {
   return buffer;
 }
 
-// Melody instruments. "bell" is the classic ToneMatrix voice (sine + quiet
-// octave partial); the raw waveforms get a lowpass and a gain trim so they
-// sit at a comparable loudness.
+// Melody instruments — the family of sounds the classic grid sequencers use.
+//
+// Voice fields: `type` main oscillator; `gain` loudness trim; `partials`
+// extra sine overtones [{ mult, amp }]; `filterMult` lowpass at freq*mult to
+// tame bright waves; `detune` cents spread across a doubled oscillator;
+// `sustain` holds at level instead of plucking; `attack`/`release` seconds;
+// `pluckLen` decay length for single-step notes; `algorithm: "karplus"`
+// switches to the plucked-string physical model.
 export const INSTRUMENTS = {
-  bell: { label: "Bell", type: "sine", gain: 1.0, partial: 0.18 },
+  bell: { label: "Bell", type: "sine", gain: 1.0, partials: [{ mult: 2, amp: 0.18 }] },
+  musicbox: {
+    label: "Music Box",
+    type: "triangle",
+    gain: 0.85,
+    partials: [{ mult: 2, amp: 0.22 }, { mult: 4, amp: 0.1 }],
+    pluckLen: 0.9,
+  },
+  marimba: {
+    label: "Marimba",
+    type: "sine",
+    gain: 1.0,
+    partials: [{ mult: 4, amp: 0.15 }],
+    pluckLen: 0.45,
+  },
+  pluck: { label: "Pluck", algorithm: "karplus", gain: 0.9 },
+  organ: {
+    label: "Organ",
+    type: "sine",
+    gain: 0.65,
+    partials: [{ mult: 2, amp: 0.5 }, { mult: 3, amp: 0.25 }],
+    sustain: true,
+    attack: 0.02,
+  },
+  pad: {
+    label: "Pad",
+    type: "sawtooth",
+    gain: 0.32,
+    filterMult: 3,
+    detune: 14,
+    sustain: true,
+    attack: 0.07,
+    release: 0.8,
+  },
   square: { label: "Square", type: "square", gain: 0.4, filterMult: 6 },
   triangle: { label: "Triangle", type: "triangle", gain: 0.9 },
   sawtooth: { label: "Saw", type: "sawtooth", gain: 0.45, filterMult: 5 },
 };
 
-// Sharp attack; single steps get the classic exponential-decay pluck, tied
-// notes sustain for their full length before releasing.
+// Sharp attack; single steps get an exponential-decay pluck (unless the
+// voice sustains), tied notes hold for their full length before releasing.
 export function playNote(chain, { midi, when, velocity = 0.7, durSteps = 1, stepDur, instrument = "bell" }) {
-  const { ctx } = chain;
   const voice = INSTRUMENTS[instrument] ?? INSTRUMENTS.bell;
   const freq = midiToFreq(midi);
+  if (voice.algorithm === "karplus") {
+    playKarplus(chain, { freq, when, velocity, durSteps, stepDur, gain: voice.gain });
+    return;
+  }
+
+  const { ctx } = chain;
   const peak = 0.32 * velocity * voice.gain;
-  const release = 0.35;
+  const attack = voice.attack ?? 0.008;
+  const release = voice.release ?? 0.35;
   let end;
 
   const env = ctx.createGain();
   env.gain.setValueAtTime(0.0001, when);
-  env.gain.exponentialRampToValueAtTime(peak, when + 0.008);
-  if (durSteps <= 1) {
-    end = when + Math.max(0.35, stepDur * 3);
+  env.gain.exponentialRampToValueAtTime(peak, when + attack);
+  if (!voice.sustain && durSteps <= 1) {
+    end = when + (voice.pluckLen ?? Math.max(0.35, stepDur * 3));
     env.gain.exponentialRampToValueAtTime(0.0001, end);
   } else {
     const hold = stepDur * durSteps;
-    env.gain.exponentialRampToValueAtTime(peak * 0.45, when + hold);
+    const holdLevel = voice.sustain ? peak * 0.85 : peak * 0.45;
+    env.gain.exponentialRampToValueAtTime(holdLevel, when + hold);
     end = when + hold + release;
     env.gain.exponentialRampToValueAtTime(0.0001, end);
   }
-
-  const osc = ctx.createOscillator();
-  osc.type = voice.type;
-  osc.frequency.value = freq;
 
   let head = env; // node the oscillators feed into
   if (voice.filterMult) {
@@ -77,27 +118,99 @@ export function playNote(chain, { midi, when, velocity = 0.7, durSteps = 1, step
     filter.connect(env);
     head = filter;
   }
-  osc.connect(head);
 
-  let partial = null;
-  if (voice.partial) {
-    partial = ctx.createOscillator();
+  const oscs = [];
+  if (voice.detune) {
+    for (const cents of [-voice.detune / 2, voice.detune / 2]) {
+      const osc = ctx.createOscillator();
+      osc.type = voice.type;
+      osc.frequency.value = freq;
+      osc.detune.value = cents;
+      const half = ctx.createGain();
+      half.gain.value = 0.5;
+      osc.connect(half);
+      half.connect(head);
+      oscs.push(osc);
+    }
+  } else {
+    const osc = ctx.createOscillator();
+    osc.type = voice.type;
+    osc.frequency.value = freq;
+    osc.connect(head);
+    oscs.push(osc);
+  }
+  for (const { mult, amp } of voice.partials ?? []) {
+    const partial = ctx.createOscillator();
     partial.type = "sine";
-    partial.frequency.value = freq * 2;
+    partial.frequency.value = freq * mult;
     const partialGain = ctx.createGain();
-    partialGain.gain.value = voice.partial;
+    partialGain.gain.value = amp;
     partial.connect(partialGain);
     partialGain.connect(head);
+    oscs.push(partial);
   }
 
   env.connect(chain.master);
   env.connect(chain.delay);
 
-  osc.start(when);
-  osc.stop(end + 0.05);
-  if (partial) {
-    partial.start(when);
-    partial.stop(end + 0.05);
+  for (const osc of oscs) {
+    osc.start(when);
+    osc.stop(end + 0.05);
+  }
+}
+
+// Karplus-Strong plucked string: a noise burst circulating through a tuned
+// delay line with lowpass damping in the feedback loop.
+function playKarplus(chain, { freq, when, velocity, durSteps, stepDur, gain }) {
+  const { ctx } = chain;
+
+  const out = ctx.createGain();
+  out.gain.value = 1.3 * velocity * gain;
+
+  const delay = ctx.createDelay(0.1);
+  delay.delayTime.value = 1 / freq;
+  const damp = ctx.createBiquadFilter();
+  damp.type = "lowpass";
+  damp.frequency.value = Math.min(freq * 10, 9000);
+  // For lowpass filters Q is resonance in DECIBELS; anything above 0 peaks
+  // over unity near cutoff and the feedback loop diverges instead of
+  // decaying. Keep it well negative.
+  damp.Q.value = -12;
+  const feedback = ctx.createGain();
+  feedback.gain.value = 0.975;
+
+  const burst = ctx.createBufferSource();
+  burst.buffer = chain.noise;
+  const burstEnv = ctx.createGain();
+  burstEnv.gain.setValueAtTime(0.8, when);
+  burstEnv.gain.linearRampToValueAtTime(0, when + Math.min(2 / freq, 0.02));
+
+  burst.connect(burstEnv);
+  burstEnv.connect(delay);
+  delay.connect(damp);
+  damp.connect(feedback);
+  feedback.connect(delay);
+  damp.connect(out);
+  out.connect(chain.master);
+  out.connect(chain.delay);
+
+  burst.start(when);
+  burst.stop(when + 0.05);
+
+  const end = when + Math.max(durSteps * stepDur, 1.4);
+  out.gain.setValueAtTime(out.gain.value, end - 0.15);
+  out.gain.exponentialRampToValueAtTime(0.0001, end);
+  feedback.gain.setValueAtTime(0, end); // kill the loop so the string dies
+
+  // Live contexts need the loop nodes disconnected once the note is done or
+  // they keep processing forever; offline renders end on their own.
+  if (typeof OfflineAudioContext === "undefined" || !(ctx instanceof OfflineAudioContext)) {
+    setTimeout(() => {
+      delay.disconnect();
+      damp.disconnect();
+      feedback.disconnect();
+      out.disconnect();
+    }, (end - ctx.currentTime) * 1000 + 500);
   }
 }
 

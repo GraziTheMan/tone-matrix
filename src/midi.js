@@ -56,7 +56,17 @@ function trackChunk(events, totalTicks, prefix = []) {
 }
 
 // GM program per instrument, so DAWs pick a comparable sound.
-const GM_PROGRAM = { bell: 10, square: 80, triangle: 72, sawtooth: 81 };
+const GM_PROGRAM = {
+  bell: 9, // glockenspiel
+  musicbox: 10,
+  marimba: 12,
+  pluck: 24, // nylon guitar
+  organ: 16, // drawbar organ
+  pad: 88, // pad 1 (new age)
+  square: 80,
+  triangle: 72, // flute
+  sawtooth: 81,
+};
 
 // segments: [{ tracks: [{ grid, tieGrid }], drumGrid, steps }] back to back.
 // trackNotes: per melody track, the MIDI note for each row (octave applied).

@@ -9,7 +9,7 @@ never got: **MIDI export**.
   time with a follow-the-playhead mode.
 - **Three melody tracks** play simultaneously, color-coded (cyan, green,
   pink) with ghost dots showing the other tracks' notes while you edit.
-  Each track has its own **instrument** (bell, square, triangle, saw) and
+  Each track has its own **instrument** (bell, music box, marimba, plucked string, organ, pad, square, triangle, saw) and
   its own **octave shift** (±2), and exports as its own MIDI track/channel
   with a matching GM program. Tap a track tab to select it, hold to mute.
 - 4×16 percussion grid underneath: open hat, closed hat, snare, kick — all
