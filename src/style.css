@@ -720,6 +720,57 @@ body {
   margin-top: 10px;
 }
 
+.mixer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.mixer-row {
+  gap: 10px;
+}
+
+.mixer-name {
+  width: 64px;
+  min-width: 64px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.mixer-row input {
+  flex: 1;
+  width: auto;
+}
+
+.mixer-val {
+  width: 44px;
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.help h3 {
+  font-size: 0.9rem;
+  color: var(--text);
+  margin: 12px 0 4px;
+}
+
+.help p {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  margin-bottom: 4px;
+}
+
+.help code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  background: var(--cell);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
 .project-save {
   display: flex;
   flex-wrap: wrap;

@@ -19,6 +19,7 @@ export async function renderSongToWav({
   melodyAudible,
   drumAudible,
   trackAudible,
+  mix,
   sampleRate = 44100,
 }) {
   const song = collectSong(segments, { melodyAudible, drumAudible, trackAudible });
@@ -29,7 +30,15 @@ export async function renderSongToWav({
 
   const duration = LEAD_IN + song.totalSteps * stepDur + TAIL;
   const ctx = new OfflineAudioContext(2, Math.ceil(duration * sampleRate), sampleRate);
-  const chain = createChain(ctx);
+  const chain = createChain(ctx, trackNotes.length);
+  // Apply the same mixer settings as live playback so the render matches.
+  if (mix) {
+    mix.trackVolumes.forEach((v, t) => {
+      if (chain.trackGains[t]) chain.trackGains[t].gain.value = v;
+    });
+    chain.drumGain.gain.value = mix.drumVolume;
+    chain.wet.gain.value = mix.delayLevel * 0.7;
+  }
 
   for (const n of song.melody) {
     playNote(chain, {
@@ -39,6 +48,7 @@ export async function renderSongToWav({
       durSteps: n.durSteps,
       stepDur,
       instrument: trackInstruments[n.track],
+      channel: n.track,
     });
   }
   for (const d of song.drums) {

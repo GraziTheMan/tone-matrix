@@ -68,6 +68,18 @@ let remapOnScaleChange = false;
 let mute = { melody: Array(ROWS).fill(false), drum: Array(DRUM_ROWS).fill(false) };
 let solo = { melody: Array(ROWS).fill(false), drum: Array(DRUM_ROWS).fill(false) };
 let midiOutId = ""; // "" = built-in synth
+// Mixer: per-track volume percent (0-150), drum volume percent, delay percent.
+let trackVolumes = [100, 100, 100];
+let drumVolume = 100;
+let delayLevel = 50;
+
+function applyMix() {
+  engine.setMix({
+    trackVolumes: trackVolumes.map((v) => v / 100),
+    drumVolume: drumVolume / 100,
+    delayLevel: delayLevel / 100,
+  });
+}
 
 function currentScaleNotes() {
   return scaleIndex === "custom"
@@ -142,6 +154,9 @@ function buildStateObject() {
     trackSettings,
     drumsMuted,
     accentBoost,
+    trackVolumes,
+    drumVolume,
+    delayLevel,
     selectedPattern,
     songChain,
     songMode,
@@ -249,6 +264,16 @@ function applyStateData(data) {
       if (Number.isInteger(data.accentBoost) && data.accentBoost >= 10 && data.accentBoost <= 100) {
         accentBoost = data.accentBoost;
       }
+      const vol = (x) => Number.isFinite(x) && x >= 0 && x <= 150;
+      trackVolumes =
+        Array.isArray(data.trackVolumes) && data.trackVolumes.length === TRACK_COUNT && data.trackVolumes.every(vol)
+          ? data.trackVolumes
+          : [100, 100, 100];
+      drumVolume = vol(data.drumVolume) ? data.drumVolume : 100;
+      delayLevel =
+        Number.isFinite(data.delayLevel) && data.delayLevel >= 0 && data.delayLevel <= 100
+          ? data.delayLevel
+          : 50;
     } else if (data.cells) {
       // Older single-pattern format: migrate into slot A.
       patterns[0] = loadPattern({
@@ -818,6 +843,65 @@ document.getElementById("duplicate").addEventListener("click", () => {
   selectPattern(target);
 });
 
+// ---- Track mixer panel -----------------------------------------------------
+
+const mixerEl = document.getElementById("mixer");
+const delayInput = document.getElementById("delay");
+const delayLabel = document.getElementById("delay-label");
+const TRACK_COLORS = ["var(--on)", "#9ccc65", "#f06292"];
+const volInputs = [];
+
+function addVolumeRow(name, color, get, set) {
+  const row = document.createElement("label");
+  row.className = "slider mixer-row";
+  const label = document.createElement("span");
+  label.className = "mixer-name";
+  label.textContent = name;
+  if (color) label.style.color = color;
+  const input = document.createElement("input");
+  input.type = "range";
+  input.min = 0;
+  input.max = 150;
+  input.step = 5;
+  const value = document.createElement("span");
+  value.className = "mixer-val";
+  const render = () => {
+    input.value = get();
+    value.textContent = `${get()}%`;
+  };
+  input.addEventListener("input", () => {
+    set(+input.value);
+    value.textContent = `${+input.value}%`;
+    applyMix();
+    saveState();
+  });
+  row.append(label, input, value);
+  mixerEl.appendChild(row);
+  return render;
+}
+
+for (let t = 0; t < TRACK_COUNT; t++) {
+  volInputs.push(
+    addVolumeRow(`Track ${t + 1}`, TRACK_COLORS[t], () => trackVolumes[t], (v) => (trackVolumes[t] = v))
+  );
+}
+volInputs.push(
+  addVolumeRow("Drums", "var(--accent)", () => drumVolume, (v) => (drumVolume = v))
+);
+
+delayInput.addEventListener("input", () => {
+  delayLevel = +delayInput.value;
+  delayLabel.textContent = `Delay ${delayLevel}%`;
+  applyMix();
+  saveState();
+});
+
+function renderMixer() {
+  for (const r of volInputs) r();
+  delayInput.value = delayLevel;
+  delayLabel.textContent = `Delay ${delayLevel}%`;
+}
+
 // ---- Track bar -------------------------------------------------------------
 
 const trackTabsEl = document.getElementById("track-tabs");
@@ -1152,6 +1236,9 @@ function resetProjectState() {
   scaleIndex = 0;
   trackSettings = defaultTrackSettings();
   drumsMuted = false;
+  trackVolumes = [100, 100, 100];
+  drumVolume = 100;
+  delayLevel = 50;
   mute = { melody: Array(ROWS).fill(false), drum: Array(DRUM_ROWS).fill(false) };
   solo = { melody: Array(ROWS).fill(false), drum: Array(DRUM_ROWS).fill(false) };
   rowNotes = currentScaleNotes();
@@ -1263,6 +1350,11 @@ function exportArgs() {
     swing: swing / 100,
     accentVelocity: midiVelFor(2),
     accentAudio: velFor(2),
+    mix: {
+      trackVolumes: trackVolumes.map((v) => v / 100),
+      drumVolume: drumVolume / 100,
+      delayLevel: delayLevel / 100,
+    },
     melodyAudible: Array.from({ length: ROWS }, (_, r) => rowAudible("melody", r)),
     drumAudible: Array.from({ length: DRUM_ROWS }, (_, r) => !drumsMuted && rowAudible("drum", r)),
   };
@@ -1611,6 +1703,8 @@ function syncUI() {
   renderDrumMap();
   renderCustomScale();
   renderProjectList();
+  renderMixer();
+  applyMix();
 }
 
 loadState();

@@ -3,9 +3,12 @@ import { midiToFreq } from "./scale.js";
 // The instrument voices, decoupled from any particular AudioContext so the
 // live engine and the offline WAV renderer share identical sound.
 
-// Master bus + the gentle feedback delay that gives the airy ToneMatrix
-// ambience. Works on both AudioContext and OfflineAudioContext.
-export function createChain(ctx) {
+// Master bus + a per-track mixer and the gentle feedback delay that gives the
+// airy ToneMatrix ambience. Works on both AudioContext and
+// OfflineAudioContext. Each melody track has its own gain (fed dry to master
+// and as a send to the delay, so track volume scales both), drums have their
+// own dry gain, and `wet` is the global delay level.
+export function createChain(ctx, trackCount = 3) {
   const master = ctx.createGain();
   master.gain.value = 0.5;
   master.connect(ctx.destination);
@@ -21,7 +24,25 @@ export function createChain(ctx) {
   delay.connect(wet);
   wet.connect(master);
 
-  return { ctx, master, delay, noise: createNoiseBuffer(ctx) };
+  const trackGains = [];
+  for (let t = 0; t < trackCount; t++) {
+    const g = ctx.createGain();
+    g.gain.value = 1;
+    g.connect(master); // dry
+    g.connect(delay); // send
+    trackGains.push(g);
+  }
+  const drumGain = ctx.createGain();
+  drumGain.gain.value = 1;
+  drumGain.connect(master); // drums stay dry
+
+  return { ctx, master, delay, wet, trackGains, drumGain, noise: createNoiseBuffer(ctx) };
+}
+
+// The gain node a melody voice on `channel` should feed into (falls back to
+// master for previews without a channel).
+function trackBus(chain, channel) {
+  return chain.trackGains?.[channel] ?? chain.master;
 }
 
 function createNoiseBuffer(ctx) {
@@ -82,11 +103,11 @@ export const INSTRUMENTS = {
 
 // Sharp attack; single steps get an exponential-decay pluck (unless the
 // voice sustains), tied notes hold for their full length before releasing.
-export function playNote(chain, { midi, when, velocity = 0.7, durSteps = 1, stepDur, instrument = "bell" }) {
+export function playNote(chain, { midi, when, velocity = 0.7, durSteps = 1, stepDur, instrument = "bell", channel }) {
   const voice = INSTRUMENTS[instrument] ?? INSTRUMENTS.bell;
   const freq = midiToFreq(midi);
   if (voice.algorithm === "karplus") {
-    playKarplus(chain, { freq, when, velocity, durSteps, stepDur, gain: voice.gain });
+    playKarplus(chain, { freq, when, velocity, durSteps, stepDur, gain: voice.gain, channel });
     return;
   }
 
@@ -150,8 +171,7 @@ export function playNote(chain, { midi, when, velocity = 0.7, durSteps = 1, step
     oscs.push(partial);
   }
 
-  env.connect(chain.master);
-  env.connect(chain.delay);
+  env.connect(trackBus(chain, channel));
 
   for (const osc of oscs) {
     osc.start(when);
@@ -161,7 +181,7 @@ export function playNote(chain, { midi, when, velocity = 0.7, durSteps = 1, step
 
 // Karplus-Strong plucked string: a noise burst circulating through a tuned
 // delay line with lowpass damping in the feedback loop.
-function playKarplus(chain, { freq, when, velocity, durSteps, stepDur, gain }) {
+function playKarplus(chain, { freq, when, velocity, durSteps, stepDur, gain, channel }) {
   const { ctx } = chain;
 
   const out = ctx.createGain();
@@ -191,8 +211,7 @@ function playKarplus(chain, { freq, when, velocity, durSteps, stepDur, gain }) {
   damp.connect(feedback);
   feedback.connect(delay);
   damp.connect(out);
-  out.connect(chain.master);
-  out.connect(chain.delay);
+  out.connect(trackBus(chain, channel));
 
   burst.start(when);
   burst.stop(when + 0.05);
@@ -232,7 +251,7 @@ function noiseSource(chain, when, dur, { type, freq, gain, q = 0, attack = 0 }) 
   env.gain.exponentialRampToValueAtTime(0.0001, when + dur);
   src.connect(filter);
   filter.connect(env);
-  env.connect(chain.master);
+  env.connect(chain.drumGain ?? chain.master);
   src.start(when);
   src.stop(when + dur + attack + 0.05);
 }
@@ -251,7 +270,7 @@ export function playDrum(chain, { id, when, velocity = 0.7 }) {
       env.gain.setValueAtTime(Math.min(0.85 * v, 1.1), when);
       env.gain.exponentialRampToValueAtTime(0.0001, when + 0.3);
       osc.connect(env);
-      env.connect(chain.master);
+      env.connect(chain.drumGain ?? chain.master);
       osc.start(when);
       osc.stop(when + 0.35);
       break;
@@ -265,7 +284,7 @@ export function playDrum(chain, { id, when, velocity = 0.7 }) {
       env.gain.setValueAtTime(0.35 * v, when);
       env.gain.exponentialRampToValueAtTime(0.0001, when + 0.12);
       body.connect(env);
-      env.connect(chain.master);
+      env.connect(chain.drumGain ?? chain.master);
       body.start(when);
       body.stop(when + 0.15);
       break;

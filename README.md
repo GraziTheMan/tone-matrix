@@ -1,24 +1,35 @@
 # Sonic Squares
 
-A small, dependency-free music toy inspired by **Rolling Tones** / the classic
-ToneMatrix and Tenori-on grid sequencers — with the one feature the original
-never got: **MIDI export**.
+A dependency-free grid music maker inspired by **Rolling Tones** / the classic
+ToneMatrix and Tenori-on sequencers — with the features the original never
+got: **MIDI and WAV export**, multiple tracks, a full drum kit, and
+**RollingTones `.tmx` import** so old songs get a second life. Published on
+Google Play; built as a web app wrapped with Capacitor.
 
 - 16-row melody grid: rows are pitches on the selected scale, columns are
   16th-note steps. Patterns can be 16, 32, or 64 steps, paged 16 columns at a
   time with a follow-the-playhead mode.
 - **Three melody tracks** play simultaneously, color-coded (cyan, green,
   pink) with ghost dots showing the other tracks' notes while you edit.
-  Each track has its own **instrument** (bell, music box, marimba, plucked string, organ, pad, square, triangle, saw) and
-  its own **octave shift** (±2), and exports as its own MIDI track/channel
-  with a matching GM program. Tap a track tab to select it, hold to mute.
+  Each track has its own **instrument** (bell, music box, marimba, plucked
+  string, organ, pad, square, triangle, saw) and its own **octave shift**
+  (±2), and exports as its own MIDI track/channel with a matching GM program.
+  Tap a track tab to select it, hold to mute.
+- **Track mixer** (Track panel): per-track and drum volume plus a global
+  delay-effect level, so you can bring a bassline forward or dry out the
+  ambience. The mix applies to playback and to WAV export.
 - 7×16 percussion grid underneath: crash, open hat, closed hat, tambourine,
   clap, snare, kick — all synthesized in Web Audio (no samples).
-- Seven scales: Major/Minor Pentatonic, Blues, Dorian, Harmonic Minor,
-  Hungarian Minor, Phrygian Dominant — any root note — plus a **custom
-  scale builder** (Settings) that assigns any MIDI note to each of the 16
-  rows. It starts as a copy of the current scale so you can tweak from
-  there.
+- **16 scales** — Major/Minor Pentatonic, Blues, the church modes (Ionian,
+  Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian), Harmonic and
+  Melodic Minor, Hungarian Minor, Phrygian Dominant, and Whole-Half
+  Diminished — at any root, plus a **custom scale builder** (Settings) that
+  assigns any MIDI note to each of the 16 rows.
+- **Import RollingTones songs**: the Projects Import button reads `.tmx`
+  save files (both the older multi-page and newer container formats),
+  mapping their melody, drums, tempo, and waveform into the app. See
+  `docs/tmx-format.md` for the reverse-engineered spec.
+- An in-app **Help & tutorial** panel covers everything above.
 - **Projects**: save named projects in-app for instant load, and
   export/import them as `.sonicsquares.json` files — on Android the share
   sheet lets you save them to any folder (Files, Drive, …) or send them to
@@ -33,7 +44,7 @@ never got: **MIDI export**.
   runs of cells into single sustained notes — by choice, so repeated 16ths
   stay repeated unless you tie them. Tied notes sustain in the synth and
   export as one long MIDI note.
-- **Eight pattern slots (A–H)** with one-tap switching, a Duplicate button,
+- **Twelve pattern slots (A–L)** with one-tap switching, a Duplicate button,
   and a **song mode**: chain patterns in any order (tap + to append the
   selected pattern, tap a chip to remove it) and the chain plays — and
   exports — as one continuous piece.

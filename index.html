@@ -26,13 +26,12 @@
             <button id="clear" class="btn" aria-haspopup="true" aria-expanded="false">Clear&hellip;</button>
             <div id="clear-menu" class="clear-menu" hidden></div>
           </div>
+          <button id="follow" class="btn active" aria-pressed="true"
+            title="Follow the playhead across pages and the song chain while playing">Follow</button>
         </div>
       </header>
       <div id="pages" class="pages" hidden>
         <div id="page-tabs" class="page-tabs"></div>
-        <button id="follow" class="btn btn-small active" aria-pressed="true" title="Follow the playhead across pages">
-          Follow
-        </button>
       </div>
       <div id="grid" class="grid" role="grid" aria-label="Melody grid"></div>
       <div id="drum-grid" class="grid drum-grid" role="grid" aria-label="Percussion grid"></div>
@@ -52,6 +51,18 @@
         <div id="song-chain" class="song-chain" aria-label="Song chain"></div>
         <button id="song-add" class="btn btn-small" title="Append the selected pattern to the song">+</button>
       </div>
+      <details class="settings" id="track-panel">
+        <summary>Track</summary>
+        <p class="settings-note">
+          Mix the layers: raise a track to bring a bassline forward, lower the
+          delay when it feels too washy.
+        </p>
+        <div id="mixer" class="mixer"></div>
+        <label class="slider setting-slider">
+          <span id="delay-label">Delay 50%</span>
+          <input id="delay" type="range" min="0" max="100" step="5" value="50" />
+        </label>
+      </details>
       <details class="settings" id="song-panel">
         <summary>Song</summary>
         <div class="panel-row">
@@ -129,6 +140,55 @@
         </p>
         <div id="drum-map" class="drum-map"></div>
         <button id="drum-map-reset" class="btn btn-small">Reset to General MIDI</button>
+      </details>
+      <details class="settings" id="help-panel">
+        <summary>Help &amp; tutorial</summary>
+        <div class="help">
+          <h3>What it is</h3>
+          <p>
+            Sonic Squares is a grid sequencer. Columns are time (16th-note
+            steps, left to right); rows are pitch (high at the top). Anything
+            you paint plays in the selected scale, so it always sounds in key.
+          </p>
+          <h3>Painting notes</h3>
+          <p>
+            Tap a cell to place a note; tap again to remove it. Drag to paint
+            several at once. <b>Press and hold</b> a note to accent it (louder);
+            hold again to un-accent. Switch the top tool to <b>Tie</b> to join a
+            note to its right-hand neighbour into one longer note.
+          </p>
+          <h3>Tracks &amp; drums</h3>
+          <p>
+            Three melody tracks (1, 2, 3) play together, each with its own
+            instrument and octave — tap a track tab to edit it, hold to mute.
+            Faint dots show the other tracks' notes. The lower grid is the drum
+            kit (crash, hats, tambourine, clap, snare, kick); the <b>Drums</b>
+            tab mutes it. The dot to the left of any row mutes that row (tap) or
+            solos it (hold).
+          </p>
+          <h3>Patterns &amp; songs</h3>
+          <p>
+            The A–L buttons are pattern slots; <b>Duplicate</b> copies the
+            current one. Turn on <b>Song</b> and tap <b>+</b> to chain patterns
+            into a full arrangement. <b>Follow</b> makes the view track what's
+            playing.
+          </p>
+          <h3>Panels</h3>
+          <p>
+            <b>Track</b> mixes track volumes and the delay effect. <b>Song</b>
+            holds tempo, swing, scale/key, pattern length, the octave buttons,
+            and the MIDI/WAV export buttons. <b>Projects</b> saves and loads
+            your work (and imports RollingTones <code>.tmx</code> files).
+            <b>Settings</b> has accent strength, a custom scale builder, live
+            MIDI output, and the drum note mapping.
+          </p>
+          <h3>Getting it out</h3>
+          <p>
+            Export MIDI to open your piece in any DAW, or Export WAV for audio.
+            On Android these open the share sheet so you can save the file
+            anywhere or send it on.
+          </p>
+        </div>
       </details>
       <footer class="hint">
         Tap or drag to paint &middot; hold a note to accent it &middot; the Tie

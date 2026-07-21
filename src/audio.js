@@ -27,6 +27,8 @@ export class AudioEngine {
     // 16ths are delayed; the grid/playhead itself stays straight.
     this.swing = 0.5;
     this.midiOut = null; // MidiOut instance, optional
+    // Mixer: per-track volume (0..1.5), drum volume, and delay level (0..1).
+    this.mix = { trackVolumes: [1, 1, 1], drumVolume: 1, delayLevel: 0.5 };
     this.ctx = null;
     this.chain = null;
     this.timer = null;
@@ -45,6 +47,23 @@ export class AudioEngine {
     if (this.ctx) return;
     this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     this.chain = createChain(this.ctx);
+    this.applyMix();
+  }
+
+  // Set the mixer and apply it live if the context exists.
+  setMix(mix) {
+    this.mix = mix;
+    this.applyMix();
+  }
+
+  applyMix() {
+    if (!this.chain) return;
+    this.mix.trackVolumes.forEach((v, t) => {
+      if (this.chain.trackGains[t]) this.chain.trackGains[t].gain.value = v;
+    });
+    this.chain.drumGain.gain.value = this.mix.drumVolume;
+    // Delay level 0..1 maps to a wet gain up to 0.7 (0.5 ≈ the old default).
+    this.chain.wet.gain.value = this.mix.delayLevel * 0.7;
   }
 
   secondsPerStep() {
@@ -111,7 +130,7 @@ export class AudioEngine {
     if (this.midiOut?.active) {
       this.midiOut.note(channel, midi, midiVelocity, this.ctx.currentTime, durSteps * stepDur, this.ctx);
     } else {
-      playNote(this.chain, { midi, velocity, durSteps, instrument, when: this.ctx.currentTime, stepDur });
+      playNote(this.chain, { midi, velocity, durSteps, instrument, channel, when: this.ctx.currentTime, stepDur });
     }
   }
 
